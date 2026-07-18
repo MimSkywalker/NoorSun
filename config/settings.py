@@ -129,3 +129,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+
+# User setting
+AUTH_USER_MODEL = 'users.User'
