@@ -4,6 +4,9 @@ from django.utils.text import slugify
 
 from core.models import TimeStampedModel
 
+from .utils import product_image_upload_path, process_product_image
+from .validators import validate_image_size, validate_image_extension
+
 
 class Category(TimeStampedModel):
 
@@ -96,7 +99,7 @@ class AttributeValue(TimeStampedModel):
 
 
 class Product(TimeStampedModel):
-    """Stores images associated with a product."""
+    """Stores main product information."""
     title = models.CharField(max_length=255)
     slug = models.SlugField(max_length=280, unique=True, blank=True)
     description = models.TextField(blank=True)
@@ -141,22 +144,26 @@ class Product(TimeStampedModel):
 
 
 class ProductImage(TimeStampedModel):
+    """Stores images associated with a product."""
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
         related_name='images',
     )
-    image = models.ImageField(upload_to='products/')
+    image = models.ImageField(
+        upload_to=product_image_upload_path,
+        validators=[validate_image_size, validate_image_extension],)
+
     is_main = models.BooleanField(default=False)
     order = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
-        verbose_name = 'ProductImage'
-        verbose_name_plural = "ProductImageS"
+        verbose_name = 'تصویر محصول'
+        verbose_name_plural = "تصویر محصولات"
         ordering = ['order']
 
     def __str__(self):
-        return f"عکس {self.order} - {self.product.title}"
+        return f"Image | {self.order} - {self.product.title}"
 
     def clean(self):
         if self.product_id:
@@ -168,13 +175,40 @@ class ProductImage(TimeStampedModel):
                     "هر محصول حداکثر می‌تواند ۶ تصویر داشته باشد.")
 
     def save(self, *args, **kwargs):
+
         self.full_clean()
+
+        if self.pk:
+            old_image = ProductImage.objects.get(pk=self.pk).image
+
+            if old_image.name != self.image.name:
+                processed = process_product_image(self.image)
+
+                self.image.save(
+                    self.image.name,
+                    processed,
+                    save=False,
+                )
+
+        else:
+            processed = process_product_image(self.image)
+
+            self.image.save(
+                self.image.name,
+                processed,
+                save=False,
+            )
+
         super().save(*args, **kwargs)
 
         if self.is_main:
             ProductImage.objects.filter(
                 product=self.product
-            ).exclude(pk=self.pk).update(is_main=False)
+            ).exclude(
+                pk=self.pk
+            ).update(
+                is_main=False
+            )
 
 
 class ProductVariant(TimeStampedModel):
