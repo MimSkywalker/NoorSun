@@ -89,8 +89,8 @@ class AttributeValue(TimeStampedModel):
     value = models.CharField(max_length=100)
 
     class Meta:
-        verbose_name = "Feature value"
-        verbose_name_plural = "Feature values"
+        verbose_name = "ویژگی محصول"
+        verbose_name_plural = "ویژگی محصولات"
         unique_together = ('attribute', 'value')
         ordering = ['attribute', 'value']
 
@@ -126,8 +126,8 @@ class Product(TimeStampedModel):
     )
 
     class Meta:
-        verbose_name = "Product"
-        verbose_name_plural = "Products"
+        verbose_name = "محصول"
+        verbose_name_plural = "محصولات"
         ordering = ['-created_at']
 
     def __str__(self):
