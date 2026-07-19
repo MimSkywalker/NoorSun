@@ -1,0 +1,17 @@
+{% extends 'products/base.html' %}
+
+{% block title %}
+  افزودن تصویر
+{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>افزودن تصویر برای «{{ product.title }}»</h2>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit" class="btn">آپلود تصویر</button>
+    </form>
+    <a href="{% url 'products:detail' product.pk %}">← بازگشت به محصول</a>
+  </div>
+{% endblock %}

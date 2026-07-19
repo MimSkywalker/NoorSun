@@ -1,0 +1,18 @@
+{% extends 'products/base.html' %}
+
+{% block title %}
+  حذف تصویر
+{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>آیا از حذف این تصویر مطمئنی؟</h2>
+    <img src="{{ object.image.url }}" style="max-width:200px; border-radius:8px;" />
+    <form method="post">
+      {% csrf_token %}
+      <br /><br />
+      <button type="submit" class="btn btn-danger">بله، حذف کن</button>
+      <a href="{% url 'products:detail' object.product_id %}" class="btn btn-secondary">انصراف</a>
+    </form>
+  </div>
+{% endblock %}

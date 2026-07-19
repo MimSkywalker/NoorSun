@@ -1,0 +1,49 @@
+{% extends "products/base.html" %}
+
+{% block title %}{{ product.title }}{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <h2>{{ product.title }}</h2>
+        <p>{{ product.description|default:"بدون توضیحات" }}</p>
+        <p>
+            <span class="badge">{{ product.category }}</span>
+            {% if product.brand %}<span class="badge">{{ product.brand }}</span>{% endif %}
+            <span class="badge">{% if product.is_active %}فعال{% else %}غیرفعال{% endif %}</span>
+        </p>
+
+        <div style="margin: 16px 0; display:flex; gap:8px;">
+            <a class="btn" href="{% url 'products:update' product.pk %}">ویرایش</a>
+            <a class="btn btn-danger" href="{% url 'products:delete' product.pk %}">حذف محصول</a>
+            <a class="btn btn-secondary" href="{% url 'products:image_add' product.pk %}">+ افزودن تصویر</a>
+        </div>
+
+        <h3>تصاویر</h3>
+        {% if product.images.all %}
+            <div class="product-grid">
+                {% for img in product.images.all %}
+                    <div class="card">
+                        <img src="{{ img.image.url }}" alt="">
+                        <p>{% if img.is_main %}<span class="badge">تصویر اصلی</span>{% endif %}</p>
+                        <a class="btn btn-danger" href="{% url 'products:image_delete' img.pk %}">حذف تصویر</a>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>هنوز تصویری اضافه نشده.</p>
+        {% endif %}
+
+        <h3>تنوع‌ها (Variants)</h3>
+        {% if product.variants.all %}
+            <ul>
+                {% for v in product.variants.all %}
+                    <li>{{ v.sku }} — <span class="price">{{ v.price }} تومان</span> — موجودی: {{ v.stock }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>هنوز تنوعی برای این محصول ثبت نشده (فعلاً از پنل ادمین اضافه کن).</p>
+        {% endif %}
+    </div>
+
+    <a href="{% url 'products:list' %}">← بازگشت به لیست</a>
+{% endblock %}

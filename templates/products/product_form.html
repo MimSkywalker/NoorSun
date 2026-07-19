@@ -1,0 +1,26 @@
+{% extends 'products/base.html' %}
+
+{% block title %}
+  {% if object %}
+    ویرایش محصول
+  {% else %}
+    محصول جدید
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>
+      {% if object %}
+        ویرایش محصول
+      {% else %}
+        محصول جدید
+      {% endif %}
+    </h2>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit" class="btn">ذخیره</button>
+    </form>
+  </div>
+{% endblock %}

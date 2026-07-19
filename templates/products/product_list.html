@@ -1,0 +1,48 @@
+{% extends 'products/base.html' %}
+
+{% block title %}
+  لیست محصولات
+{% endblock %}
+
+{% block content %}
+  <h2>محصولات</h2>
+
+  {% if products %}
+    <div class="product-grid">
+      {% for product in products %}
+        <div class="card">
+          {% with img=product.images.first %}
+            {% if img %}
+              <img src="{{ img.image.url }}" alt="{{ product.title }}" />
+            {% else %}
+              <img src="https://via.placeholder.com/220x160?text=No+Image" alt="بدون تصویر" />
+            {% endif %}
+          {% endwith %}
+          <h3><a href="{% url 'products:detail' product.pk %}">{{ product.title }}</a></h3>
+          <p>
+            <span class="badge">{{ product.category }}</span>
+            {% if not product.is_active %}
+              <span class="badge">غیرفعال</span>
+            {% endif %}
+          </p>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if is_paginated %}
+      <div style="margin-top:20px;">
+        {% if page_obj.has_previous %}
+          <a class="btn btn-secondary" href="?page={{ page_obj.previous_page_number }}">قبلی</a>
+        {% endif %}
+        <span>صفحه {{ page_obj.number }} از {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+          <a class="btn btn-secondary" href="?page={{ page_obj.next_page_number }}">بعدی</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% else %}
+    <p>
+      هنوز محصولی ثبت نشده. <a href="{% url 'products:create' %}">اولین محصول رو اضافه کن</a>.
+    </p>
+  {% endif %}
+{% endblock %}
