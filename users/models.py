@@ -54,6 +54,12 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class OTPRequest(models.Model):
+
+    """
+    Stores OTP requests for phone-based authentication.
+    Handles code generation, expiration, resend limitation, and verification attempts.
+    """
+
     class Purpose(models.TextChoices):
         REGISTER_LOGIN = 'register_login', 'ثبت‌نام یا ورود'
         PASSWORD_RESET = 'password_reset', 'بازیابی رمز عبور'
@@ -75,10 +81,20 @@ class OTPRequest(models.Model):
         indexes = [models.Index(fields=['phone_number', 'purpose', 'is_used'])]
 
     def __str__(self):
+        """
+        Returns a readable representation of the OTP request.
+        """
         return f'{self.phone_number} - {self.get_purpose_display()}'
 
     @classmethod
     def generate(cls, phone_number, purpose):
+
+        """
+        Creates a new OTP request.
+        Checks the resend cooldown period, generates a random six-digit code,
+        and stores the OTP with an expiration time.
+        """
+
         last = cls.objects.filter(
             phone_number=phone_number, purpose=purpose
         ).order_by('-created_at').first()
@@ -96,10 +112,19 @@ class OTPRequest(models.Model):
 
     @property
     def is_expired(self):
+
+        """
+        Checks whether the OTP code has passed its expiration time.
+        """
         return timezone.now() > self.expires_at
 
     def verify(self, submitted_code):
+        """
+        Verifies a submitted OTP code.
 
+        Checks whether the code is already used, expired, or exceeds
+        the maximum number of attempts. Returns a success status and message.
+        """
         if self.is_used:
             return False, 'این کد قبلاً استفاده شده است.'
         if self.is_expired:
