@@ -150,3 +150,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 # User setting
 AUTH_USER_MODEL = 'users.User'
+
+
+EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
