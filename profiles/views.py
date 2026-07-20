@@ -8,6 +8,12 @@ from django.views import View
 from .forms import EmailChangeForm, EmailVerifyCodeForm
 from .models import EmailVerification
 
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import DetailView, UpdateView
+from django.urls import reverse_lazy
+
+from .models import Profile
+from .forms import ProfileForm
 
 
 # Session key used to store the email address
@@ -25,7 +31,8 @@ class EmailVerificationRequestView(LoginRequiredMixin, View):
     template_name = 'profiles/email_verification_request.html'
 
     def get(self, request):
-        initial = {'email': request.user.profile.email} if request.user.profile.email else {}
+        initial = {
+            'email': request.user.profile.email} if request.user.profile.email else {}
         form = EmailChangeForm(initial=initial, current_user=request.user)
         return render(request, self.template_name, {'form': form})
 
@@ -37,7 +44,8 @@ class EmailVerificationRequestView(LoginRequiredMixin, View):
         email = form.cleaned_data['email']
 
         try:
-            verification = EmailVerification.generate(user=request.user, email=email)
+            verification = EmailVerification.generate(
+                user=request.user, email=email)
         except ValueError as e:
             messages.error(request, str(e))
             return render(request, self.template_name, {'form': form})
@@ -61,7 +69,7 @@ class EmailVerificationConfirmView(LoginRequiredMixin, View):
     Verifies the submitted code and marks the
     email address as verified.
     """
-   
+
     template_name = 'profiles/email_verification_confirm.html'
 
     def get(self, request):
@@ -96,3 +104,48 @@ class EmailVerificationConfirmView(LoginRequiredMixin, View):
         del request.session[SESSION_PENDING_EMAIL_KEY]
         messages.success(request, "ایمیل با موفقیت تأیید شد.")
         return redirect(reverse('profiles:detail'))
+
+
+class ProfileDetailView(LoginRequiredMixin, DetailView):
+    """
+    Displays the authenticated user's profile.
+    """
+    model = Profile
+    template_name = 'profiles/profile_detail.html'
+    context_object_name = 'profile'
+
+    def get_object(self, queryset=None):
+        """
+        Always return the logged-in user's profile.
+
+        This prevents users from accessing other profiles
+        through URL manipulation.
+        """
+        return self.request.user.profile
+
+
+class ProfileUpdateView(LoginRequiredMixin, UpdateView):
+
+    """
+    Allows the authenticated user to update
+    their own profile information.
+    """
+    model = Profile
+    form_class = ProfileForm
+    template_name = 'profiles/profile_form.html'
+    success_url = reverse_lazy('profiles:detail')
+
+    def get_object(self, queryset=None):
+        """
+        Return the current user's profile instead of
+        looking it up by a URL parameter.
+        """
+        return self.request.user.profile
+
+    def form_valid(self, form):
+        """
+        Displays a success message after the profile
+        has been updated successfully.
+        """
+        messages.success(self.request, "پروفایل با موفقیت به‌روزرسانی شد.")
+        return super().form_valid(form)

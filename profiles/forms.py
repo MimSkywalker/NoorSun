@@ -38,3 +38,17 @@ class EmailVerifyCodeForm(forms.Form):
         label="کد تأیید",
         widget=forms.TextInput(attrs={'inputmode': 'numeric'}),
     )
+
+
+class ProfileForm(forms.ModelForm):
+    """
+    Form for updating user profile information.
+
+    Email is intentionally excluded because email changes
+    must go through the email verification workflow.
+    """
+    class Meta:
+        # Email is excluded intentionally.
+        # Users must verify a new email before it can be updated.
+        model = Profile
+        fields = ['avatar', 'gender', 'birth_date', 'wants_promotional_sms']
