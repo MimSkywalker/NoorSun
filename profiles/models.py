@@ -10,7 +10,10 @@ from django.core.validators import FileExtensionValidator
 from django.db import models
 
 from core.models import TimeStampedModel
-from datetime import date
+import secrets
+
+from datetime import date, timedelta
+from django.utils import timezone
 
 
 def validate_birth_date(value):
@@ -88,7 +91,8 @@ class Profile(TimeStampedModel):
         FileExtensionValidator(allowed_extensions=[
                                "jpg", "jpeg", "png", "webp"]),
     ],)
-    email = models.EmailField(blank=True, null=True)
+    email = models.EmailField(blank=True, null=True, unique=True)
+    is_email_verified = models.BooleanField(default=False)
     birth_date = models.DateField(
         null=True, blank=True,  validators=[validate_birth_date])
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True)
@@ -98,7 +102,7 @@ class Profile(TimeStampedModel):
     def __str__(self):
         return f'profile | {self.user.phone_number}'
 
-    def save(self, *args, **kwargs):
+    def save(self, *args, verified_email_change=False, **kwargs):
         old_avatar = None
         avatar_changed = self.pk is None
 
@@ -117,9 +121,71 @@ class Profile(TimeStampedModel):
         if avatar_changed and old_avatar and 'defaults' not in old_avatar.name:
             old_avatar.delete(save=False)
 
-        if self.email and self.gender and self.birth_date:
+        if self.pk and not verified_email_change:
+            old_email = Profile.objects.filter(
+                pk=self.pk).values_list('email', flat=True).first()
+            if old_email != self.email:
+                self.is_email_verified = False
+
+        if self.email and self.gender and self.birth_date and self.is_email_verified:
             self.is_completed = True
         else:
             self.is_completed = False
 
         super().save(*args, **kwargs)
+
+
+class EmailVerification(TimeStampedModel):
+    RESEND_COOLDOWN_SECONDS = 60
+    CODE_LIFETIME_MINUTES = 15
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='email_verifications'
+    )
+    email = models.EmailField()
+    code = models.CharField(max_length=6)
+    is_used = models.BooleanField(default=False)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.email} - {self.user.phone_number}'
+
+    @classmethod
+    def generate(cls, user, email):
+        last = cls.objects.filter(
+            user=user, email=email).order_by('-created_at').first()
+        if last and (timezone.now() - last.created_at).total_seconds() < cls.RESEND_COOLDOWN_SECONDS:
+            raise ValueError('لطفاً کمی صبر کنید و دوباره تلاش کنید.')
+
+        code = f'{secrets.randbelow(1000000):06d}'
+        return cls.objects.create(
+            user=user,
+            email=email,
+            code=code,
+            expires_at=timezone.now() + timedelta(minutes=cls.CODE_LIFETIME_MINUTES),
+        )
+
+    @property
+    def is_expired(self):
+        return timezone.now() > self.expires_at
+
+    def verify(self, submitted_code):
+        if self.is_used:
+            return False, 'این کد قبلاً استفاده شده است.'
+        if self.is_expired:
+            return False, 'کد منقضی شده، دوباره درخواست بدهید.'
+        if self.code != submitted_code:
+            return False, 'کد وارد شده نادرست است.'
+
+        self.is_used = True
+        self.save(update_fields=['is_used'])
+
+        profile = self.user.profile
+        profile.email = self.email
+        profile.is_email_verified = True
+        profile.save(verified_email_change=True)
+        return True, None
+
