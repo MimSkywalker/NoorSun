@@ -10,9 +10,33 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 User = get_user_model()
 
+
+PASSWORD_ERROR_MESSAGES_FA = {
+    'password_too_short': "رمز عبور خیلی کوتاه است. حداقل باید {min_length} کاراکتر باشد.",
+    'password_too_common': "این رمز عبور بسیار رایج و قابل حدس است. رمز دیگری انتخاب کنید.",
+    'password_entirely_numeric': "رمز عبور نباید فقط شامل عدد باشد.",
+    'password_too_similar': "رمز عبور نباید شبیه به اطلاعات شخصی شما (مثل شماره موبایل) باشد.",
+}
+
+def validate_password_fa(password, user=None):
+    try:
+        validate_password(password, user=user)
+    except DjangoValidationError as e:
+        fa_messages = []
+        for error in e.error_list:
+            code = getattr(error, 'code', None)
+            params = error.params or {}
+            if code in PASSWORD_ERROR_MESSAGES_FA:
+                fa_messages.append(PASSWORD_ERROR_MESSAGES_FA[code].format(**params))
+            else:
+                fa_messages.append(str(error.message))
+        raise forms.ValidationError(fa_messages)
+
+    
 class PhoneNumberForm(forms.Form):
 
     """
@@ -67,7 +91,7 @@ class SetNewPasswordForm(forms.Form):
         if p1 and p2 and p1 != p2:
             raise forms.ValidationError("رمزهای وارد شده یکسان نیستند.")
         if p1:
-            validate_password(p1)
+            validate_password_fa(p1)
         return cleaned
 
 
@@ -124,3 +148,32 @@ class EmailPasswordResetForm(forms.Form):
                 from_email=None,
                 recipient_list=[self.cleaned_data['email']],
             )
+
+
+
+class RegisterWithPasswordForm(forms.Form):
+    phone_number = forms.CharField(max_length=11, validators=[phone_validator], label="شماره موبایل")
+    password1 = forms.CharField(label="رمز عبور", widget=forms.PasswordInput)
+    password2 = forms.CharField(label="تکرار رمز عبور", widget=forms.PasswordInput)
+
+    def clean_phone_number(self):
+        phone_number = self.cleaned_data['phone_number']
+        if User.objects.filter(phone_number=phone_number).exists():
+            raise forms.ValidationError(
+                "این شماره قبلاً ثبت شده است. از صفحه‌ی ورود یا ورود با OTP استفاده کنید."
+            )
+        return phone_number
+
+    def clean(self):
+        cleaned = super().clean()
+        p1, p2 = cleaned.get('password1'), cleaned.get('password2')
+        if p1 and p2 and p1 != p2:
+            raise forms.ValidationError("رمزهای وارد شده یکسان نیستند.")
+        if p1:
+            validate_password_fa(p1) 
+        return cleaned
+
+
+class PhoneLoginForm(forms.Form):
+    phone_number = forms.CharField(max_length=11, validators=[phone_validator], label="شماره موبایل")
+    password = forms.CharField(label="رمز عبور", widget=forms.PasswordInput)
