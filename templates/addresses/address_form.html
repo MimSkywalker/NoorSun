@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}فرم آدرس{% endblock %}
+{% block content %}
+<h1>آدرس</h1>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">ذخیره</button>
+</form>
+{% endblock %}
+{% block extra_js %}
+<script>
+    // فیلتر ساده‌ی شهر بر اساس استان — نسخه‌ی حداقلی؛
+    // در تم نهایی جای‌گذاری استان/شهر با UX بهتر جایگزین می‌شود.
+</script>
+{% endblock %}

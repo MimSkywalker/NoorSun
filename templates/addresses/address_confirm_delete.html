@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block title %}
+  حذف آدرس
+{% endblock %}
+{% block content %}
+  <h1>آیا از حذف این آدرس مطمئن هستید؟</h1>
+  <p>{{ object.title }} — {{ object.full_address }}</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit">بله، حذف کن</button>
+  </form>
+  <a href="{% url 'addresses:list' %}">انصراف</a>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}آدرس‌های من{% endblock %}
+{% block content %}
+<h1>آدرس‌های من</h1>
+<a href="{% url 'addresses:create' %}">افزودن آدرس جدید</a>
+<ul>
+{% for address in addresses %}
+    <li>
+        <strong>{{ address.title }}</strong>
+        {% if address.is_default %}(پیش‌فرض){% endif %}<br>
+        {{ address.city.province.title }} / {{ address.city.title }} — {{ address.full_address }}<br>
+        <a href="{% url 'addresses:update' address.pk %}">ویرایش</a>
+        <a href="{% url 'addresses:delete' address.pk %}">حذف</a>
+        {% if not address.is_default %}
+        <form method="post" action="{% url 'addresses:set_default' address.pk %}" style="display:inline">
+            {% csrf_token %}
+            <button type="submit">تعیین به‌عنوان پیش‌فرض</button>
+        </form>
+        {% endif %}
+    </li>
+{% empty %}
+    <li>هنوز آدرسی ثبت نکرده‌اید.</li>
+{% endfor %}
+</ul>
+{% endblock %}

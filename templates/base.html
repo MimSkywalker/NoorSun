@@ -1,0 +1,76 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      {% block title %}
+        فروشگاه
+      {% endblock %}
+    </title>
+    <link rel="stylesheet" href="{% static 'css/main.css' %}" />
+    {% block extra_css %}
+
+    {% endblock %}
+  </head>
+  <body>
+    <header>
+      <nav>
+        <a href="/">خانه</a>
+        <a href="{% url 'products:list' %}">محصولات</a>
+        {% if user.is_authenticated %}
+          <a href="{% url 'profiles:detail' %}">پروفایل</a>
+          <a href="{% url 'addresses:list' %}">آدرس‌ها</a>
+          <a href="{% url 'users:login_password' %}">ورود با پسورد</a>
+          <a href="{% url 'users:login_password' %}">بازیابی پسورد</a>
+
+          <form method="post" action="{% url 'users:logout' %}" style="display:inline">
+            {% csrf_token %}
+            <button type="submit">خروج</button>
+          </form>
+        {% else %}
+          <a href="{% url 'users:request_otp' %}">ورود / ثبت‌نام</a>
+        {% endif %}
+      </nav>
+    </header>
+
+    <main>
+      {% if messages %}
+        <ul class="messages">
+          {% for message in messages %}
+            <li class="{{ message.tags }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      {% block content %}
+
+      {% endblock %}
+    </main>
+
+    <footer>
+      <p>فروشگاه — نسخه‌ی توسعه</p>
+    </footer>
+
+    {% block extra_js %}
+
+    {% endblock %}
+    <script>
+      document.addEventListener('submit', function (e) {
+        const form = e.target
+        const btn = form.querySelector('button[type="submit"]')
+        if (btn) {
+          if (btn.disabled) {
+            e.preventDefault()
+            return
+          }
+          btn.disabled = true
+          setTimeout(() => {
+            btn.disabled = false
+          }, 3000) // ایمنی در صورت خطای شبکه
+        }
+      })
+    </script>
+  </body>
+</html>

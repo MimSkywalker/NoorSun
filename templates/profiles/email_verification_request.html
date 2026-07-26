@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}تأیید ایمیل{% endblock %}
+{% block content %}
+<h1>ایمیل خود را وارد کنید</h1>
+<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">ارسال کد</button></form>
+{% endblock %}

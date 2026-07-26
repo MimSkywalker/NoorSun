@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}پروفایل{% endblock %}
+{% block content %}
+<h1>پروفایل من</h1>
+<p>شماره موبایل: {{ profile.user.phone_number }}</p>
+<p>ایمیل: {{ profile.email|default:"ثبت نشده" }} {% if profile.is_email_verified %}(تأییدشده){% else %}(تأییدنشده){% endif %}</p>
+<p>جنسیت: {{ profile.get_gender_display|default:"—" }}</p>
+<p>تاریخ تولد: {{ profile.birth_date|default:"—" }}</p>
+
+<a href="{% url 'profiles:update' %}">ویرایش پروفایل</a>
+<a href="{% url 'profiles:email_verify_request' %}">افزودن/تأیید ایمیل</a>
+{% endblock %}

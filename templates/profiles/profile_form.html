@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}ویرایش پروفایل{% endblock %}
+{% block content %}
+<h1>ویرایش پروفایل</h1>
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">ذخیره</button>
+</form>
+{% endblock %}
