@@ -98,8 +98,28 @@ class AddressDeleteView(LoginRequiredMixin, DeleteView):
         Display a success message after
         deleting the address.
         """
+        address = self.get_object()
+        was_default = address.is_default
+        user = address.user
+
+        response = super().form_valid(form)
+
+        if was_default:
+            next_default = (
+                Address.objects.filter(user=user)
+                .order_by('-created_at')
+                .first()
+            )
+            if next_default:
+                next_default.is_default = True
+                next_default.save()
+
         messages.success(self.request, "آدرس حذف شد.")
-        return super().form_valid(form)
+        return response
+
+
+
+    
 
 
 class AddressSetDefaultView(LoginRequiredMixin, View):
