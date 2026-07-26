@@ -8,8 +8,8 @@ class UserAdmin(BaseUserAdmin):
 
     model = User
     list_display = ('phone_number', 'first_name',
-                    'last_name', 'is_staff', 'is_active')
-    list_filter = ('is_staff', 'is_active')
+                    'last_name', 'is_staff', 'is_active', 'is_phone_verified')
+    list_filter = ('is_staff', 'is_active', 'is_phone_verified')
     search_fields = ('phone_number', 'first_name', 'last_name')
     ordering = ('phone_number',)
 
@@ -32,7 +32,8 @@ admin.site.register(User, UserAdmin)
 
 @admin.register(OTPRequest)
 class OTPRequestAdmin(admin.ModelAdmin):
-    list_display = ('phone_number', 'purpose', 'is_used', 'attempts', 'created_at', 'expires_at')
+    list_display = ('phone_number', 'purpose', 'is_used',
+                    'attempts', 'created_at', 'expires_at')
     list_filter = ('purpose', 'is_used')
     search_fields = ('phone_number',)
     readonly_fields = ('code', 'created_at', 'expires_at', 'attempts')
