@@ -2,7 +2,7 @@ import io
 import random
 
 from PIL import Image
-
+import uuid
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
@@ -30,7 +30,7 @@ def random_default_avatar():
 
 
 def user_avatar_path(instance, filename):
-    return f"avatars/users/{instance.user_id}/avatar.webp"
+    return f"avatars/users/{instance.user_id}/avatar_{uuid.uuid4().hex[:8]}.webp"
 
 
 def validate_image_size(image):
@@ -119,7 +119,11 @@ class Profile(TimeStampedModel):
             self.avatar = converted
 
         if avatar_changed and old_avatar and 'defaults' not in old_avatar.name:
-            old_avatar.delete(save=False)
+            try:
+                old_avatar.delete(save=False)
+            except (PermissionError, OSError):
+                pass
+
 
         if self.pk and not verified_email_change:
             old_email = Profile.objects.filter(
@@ -136,14 +140,24 @@ class Profile(TimeStampedModel):
 
 
 class EmailVerification(TimeStampedModel):
+
+    # Maximum number of verification attempts
+    MAX_ATTEMPTS = 5
+
+    # Cooldown before requesting another code
     RESEND_COOLDOWN_SECONDS = 60
+
+    # Verification code lifetime
     CODE_LIFETIME_MINUTES = 15
 
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='email_verifications'
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='email_verifications',
     )
     email = models.EmailField()
     code = models.CharField(max_length=6)
+    attempts = models.PositiveSmallIntegerField(default=0)
     is_used = models.BooleanField(default=False)
     expires_at = models.DateTimeField()
 
@@ -155,37 +169,65 @@ class EmailVerification(TimeStampedModel):
 
     @classmethod
     def generate(cls, user, email):
-        last = cls.objects.filter(
-            user=user, email=email).order_by('-created_at').first()
-        if last and (timezone.now() - last.created_at).total_seconds() < cls.RESEND_COOLDOWN_SECONDS:
+        # Prevent requesting a new code too quickly
+        last = (
+            cls.objects
+            .filter(user=user, email=email)
+            .order_by('-created_at')
+            .first()
+        )
+
+        if (
+            last
+            and (timezone.now() - last.created_at).total_seconds()
+            < cls.RESEND_COOLDOWN_SECONDS
+        ):
             raise ValueError('لطفاً کمی صبر کنید و دوباره تلاش کنید.')
 
         code = f'{secrets.randbelow(1000000):06d}'
+
         return cls.objects.create(
             user=user,
             email=email,
             code=code,
-            expires_at=timezone.now() + timedelta(minutes=cls.CODE_LIFETIME_MINUTES),
+            expires_at=timezone.now() + timedelta(
+                minutes=cls.CODE_LIFETIME_MINUTES
+            ),
         )
 
     @property
     def is_expired(self):
+        """Return True if the verification code has expired."""
         return timezone.now() > self.expires_at
 
     def verify(self, submitted_code):
+        # Reject already used codes
         if self.is_used:
             return False, 'این کد قبلاً استفاده شده است.'
+
+        # Reject expired codes
         if self.is_expired:
             return False, 'کد منقضی شده، دوباره درخواست بدهید.'
+
+        # Stop verification after too many failed attempts
+        if self.attempts >= self.MAX_ATTEMPTS:
+            return False, 'تعداد تلاش مجاز تمام شده. دوباره درخواست دهید.'
+
+        # Count this verification attempt
+        self.attempts += 1
+
+        # Invalid verification code
         if self.code != submitted_code:
+            self.save(update_fields=['attempts'])
             return False, 'کد وارد شده نادرست است.'
 
+        # Mark the code as used
         self.is_used = True
-        self.save(update_fields=['is_used'])
+        self.save(update_fields=['attempts', 'is_used'])
 
         profile = self.user.profile
         profile.email = self.email
         profile.is_email_verified = True
         profile.save(verified_email_change=True)
-        return True, None
 
+        return True, None
