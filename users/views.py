@@ -1,8 +1,8 @@
 
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import login, logout, authenticate
 
-from .forms import PhoneNumberForm, OTPVerifyForm
+from .forms import PhoneNumberForm, OTPVerifyForm, PhoneLoginForm, RegisterWithPasswordForm
 from .models import User, OTPRequest
 from .services import sms_service
 
@@ -32,9 +32,14 @@ class RequestOTPView(View):
     template_name = 'users/request_otp.html'
 
     def get(self, request):
+        if request.user.is_authenticated:
+            return redirect(reverse('profiles:detail'))
         return render(request, self.template_name, {'form': PhoneNumberForm()})
 
     def post(self, request):
+        if request.user.is_authenticated:
+            return redirect(reverse('profiles:detail'))
+
         form = PhoneNumberForm(request.POST)
         if not form.is_valid():
             return render(request, self.template_name, {'form': form})
@@ -42,7 +47,8 @@ class RequestOTPView(View):
         phone_number = form.cleaned_data['phone_number']
 
         try:
-            otp = OTPRequest.generate(phone_number, purpose=OTPRequest.Purpose.REGISTER_LOGIN)
+            otp = OTPRequest.generate(
+                phone_number, purpose=OTPRequest.Purpose.REGISTER_LOGIN)
         except ValueError as e:
             messages.error(request, str(e))
             return render(request, self.template_name, {'form': form})
@@ -65,11 +71,16 @@ class VerifyOTPView(View):
     template_name = 'users/verify_otp.html'
 
     def get(self, request):
+        if request.user.is_authenticated:
+            return redirect(reverse('profiles:detail'))
         if SESSION_PHONE_KEY not in request.session:
             return redirect(reverse('users:request_otp'))
         return render(request, self.template_name, {'form': OTPVerifyForm()})
 
     def post(self, request):
+        if request.user.is_authenticated:
+            return redirect(reverse('profiles:detail'))
+
         phone_number = request.session.get(SESSION_PHONE_KEY)
         if not phone_number:
             return redirect(reverse('users:request_otp'))
@@ -86,11 +97,17 @@ class VerifyOTPView(View):
         )
 
         if not otp:
-            messages.error(request, "درخواستی برای این شماره یافت نشد. دوباره تلاش کنید.")
+            messages.error(
+                request, "درخواستی برای این شماره یافت نشد. دوباره تلاش کنید.")
             return redirect(reverse('users:request_otp'))
 
         ok, error = otp.verify(form.cleaned_data['code'])
         if not ok:
+            if otp.attempts >= otp.MAX_ATTEMPTS:
+                messages.error(
+                    request, "تعداد تلاش مجاز تمام شده. دوباره درخواست دهید.")
+                request.session.pop(SESSION_PHONE_KEY, None)
+                return redirect(reverse('users:request_otp'))
             messages.error(request, error)
             return render(request, self.template_name, {'form': form})
 
@@ -98,20 +115,24 @@ class VerifyOTPView(View):
             phone_number=phone_number,
             defaults={'is_phone_verified': True},
         )
+        if created:
+            user.set_unusable_password()
+            user.save(update_fields=['password', 'is_phone_verified'])
+
         if not created and not user.is_phone_verified:
             user.is_phone_verified = True
             user.save(update_fields=['is_phone_verified'])
 
         login(request, user)
-        del request.session[SESSION_PHONE_KEY]
+        request.session.pop(SESSION_PHONE_KEY, None)
 
         if created:
             messages.success(request, "ثبت‌نام با موفقیت انجام شد.")
         else:
             messages.success(request, "با موفقیت وارد شدید.")
 
-        return redirect(reverse('profiles:detail')) 
-    
+        return redirect(reverse('profiles:detail'))
+
 
 # Stores the phone number used during OTP verification
 SESSION_PHONE_KEY = 'otp_phone_number'
@@ -163,11 +184,13 @@ class PasswordResetRequestOTPView(View):
         if not User.objects.filter(phone_number=phone_number).exists():
             # پیام یکسان با حالت موفق، تا این فرم برای کشف وجود/عدم‌وجود
             # یک شماره در سیستم قابل سوءاستفاده نباشه.
-            messages.success(request, "در صورت وجود این شماره در سیستم، کد ارسال شد.")
+            messages.success(
+                request, "در صورت وجود این شماره در سیستم، کد ارسال شد.")
             return redirect(reverse('users:password_reset_verify_otp'))
 
         try:
-            otp = OTPRequest.generate(phone_number, purpose=OTPRequest.Purpose.PASSWORD_RESET)
+            otp = OTPRequest.generate(
+                phone_number, purpose=OTPRequest.Purpose.PASSWORD_RESET)
         except ValueError as e:
             messages.error(request, str(e))
             return render(request, self.template_name, {'form': form})
@@ -213,10 +236,16 @@ class PasswordResetVerifyOTPView(View):
 
         ok, error = otp.verify(form.cleaned_data['code'])
         if not ok:
+            if otp.attempts >= otp.MAX_ATTEMPTS:
+                messages.error(
+                    request, "تعداد تلاش مجاز تمام شده. دوباره درخواست دهید.")
+                request.session.pop(SESSION_PWRESET_PHONE_KEY, None)
+                return redirect(reverse('users:password_reset_request_otp'))
+
             messages.error(request, error)
             return render(request, self.template_name, {'form': form})
 
-        del request.session[SESSION_PWRESET_PHONE_KEY]
+        request.session.pop(SESSION_PWRESET_PHONE_KEY, None)
         request.session[SESSION_PWRESET_VERIFIED_KEY] = phone_number
         return redirect(reverse('users:password_reset_set_new'))
 
@@ -246,9 +275,10 @@ class PasswordResetSetNewView(View):
         user.set_password(form.cleaned_data['new_password1'])
         user.save(update_fields=['password'])
 
-        del request.session[SESSION_PWRESET_VERIFIED_KEY]
+        request.session.pop(SESSION_PWRESET_VERIFIED_KEY, None)
+        login(request, user)
         messages.success(request, "رمز عبور تغییر کرد. اکنون وارد شوید.")
-        return redirect(reverse('users:request_otp'))
+        return redirect(reverse('profiles:detail'))
 
 
 # ---------------- Email ----------------
@@ -317,5 +347,65 @@ class EmailPasswordResetConfirmView(View):
 
         user.set_password(form.cleaned_data['new_password1'])
         user.save(update_fields=['password'])
+        login(request, user)
         messages.success(request, "رمز عبور تغییر کرد. اکنون وارد شوید.")
+        return redirect(reverse('profiles:detail'))
+
+
+class LogoutView(View):
+    def post(self, request):
+        logout(request)
+        messages.success(request, "با موفقیت خارج شدید.")
         return redirect(reverse('users:request_otp'))
+
+
+class RegisterWithPasswordView(View):
+    template_name = 'users/register_password.html'
+
+    def get(self, request):
+        return render(request, self.template_name, {'form': RegisterWithPasswordForm()})
+
+    def post(self, request):
+        form = RegisterWithPasswordForm(request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form})
+
+        user = User.objects.create_user(
+            phone_number=form.cleaned_data['phone_number'],
+            password=form.cleaned_data['password1'],
+        )
+        # چون شماره از مسیر پیامک تأیید نشده:
+        user.is_phone_verified = False
+        user.save(update_fields=['is_phone_verified'])
+
+        login(request, user)
+        messages.success(
+            request,
+            "ثبت‌نام با موفقیت انجام شد. توصیه می‌شود در فرصتی مناسب شماره‌ی خود را با پیامک نیز تأیید کنید."
+        )
+        return redirect(reverse('profiles:detail'))
+
+
+class PhoneLoginView(View):
+    template_name = 'users/login_password.html'
+
+    def get(self, request):
+        return render(request, self.template_name, {'form': PhoneLoginForm()})
+
+    def post(self, request):
+        form = PhoneLoginForm(request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form})
+
+        user = authenticate(
+            request,
+            username=form.cleaned_data['phone_number'],
+            password=form.cleaned_data['password'],
+        )
+        if user is None:
+            messages.error(request, "شماره موبایل یا رمز عبور اشتباه است.")
+            return render(request, self.template_name, {'form': form})
+
+        login(request, user)
+        messages.success(request, "با موفقیت وارد شدید.")
+        return redirect(reverse('profiles:detail'))
