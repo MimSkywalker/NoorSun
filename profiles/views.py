@@ -98,10 +98,14 @@ class EmailVerificationConfirmView(LoginRequiredMixin, View):
 
         ok, error = verification.verify(form.cleaned_data['code'])
         if not ok:
+            if verification.attempts >= verification.MAX_ATTEMPTS:
+                messages.error(request, "تعداد تلاش مجاز تمام شده. دوباره درخواست دهید.")
+                request.session.pop(SESSION_PENDING_EMAIL_KEY, None)
+                return redirect(reverse('profiles:email_verify_request'))
             messages.error(request, error)
             return render(request, self.template_name, {'form': form})
 
-        del request.session[SESSION_PENDING_EMAIL_KEY]
+        request.session.pop(SESSION_PENDING_EMAIL_KEY, None)
         messages.success(request, "ایمیل با موفقیت تأیید شد.")
         return redirect(reverse('profiles:detail'))
 

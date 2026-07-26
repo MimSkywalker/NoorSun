@@ -102,6 +102,7 @@ class OTPRequest(models.Model):
         if last and (timezone.now() - last.created_at).total_seconds() < cls.RESEND_COOLDOWN_SECONDS:
             raise ValueError('لطفاً کمی صبر کنید و دوباره تلاش کنید.')
 
+
         code = f'{random.randint(0, 999999):06d}'
         return cls.objects.create(
             phone_number=phone_number,
