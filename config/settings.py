@@ -151,5 +151,10 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # User setting
 AUTH_USER_MODEL = 'users.User'
 
-
+# Email anf OTP Setting
 EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+
+
+# LogIn and SignUp Setting
+LOGIN_URL = 'users:request_otp'
+
