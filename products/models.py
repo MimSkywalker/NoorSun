@@ -125,10 +125,16 @@ class Product(TimeStampedModel):
         help_text="در صورت ناموجود شدن دائمی، محصول جایگزین معرفی می‌شود.",
     )
 
+    sales_count = models.PositiveIntegerField(default=0)
+
     class Meta:
         verbose_name = "محصول"
         verbose_name_plural = "محصولات"
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['title']),
+            models.Index(fields=['-created_at']),
+        ]
 
     def __str__(self):
         return self.title
@@ -228,10 +234,17 @@ class ProductVariant(TimeStampedModel):
     stock = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
 
+    discount_price = models.DecimalField(
+        max_digits=10, decimal_places=0, null=True, blank=True
+    )
+
     class Meta:
         verbose_name = "تنوع محصول"
         verbose_name_plural = "تنوع‌های محصول"
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['price']),
+        ]
 
     def __str__(self):
         attrs = ", ".join(str(v) for v in self.attribute_values.all())
@@ -240,3 +253,11 @@ class ProductVariant(TimeStampedModel):
     @property
     def is_in_stock(self):
         return self.stock > 0 and self.is_active
+
+    @property
+    def final_price(self):
+        return self.discount_price if self.discount_price else self.price
+
+    @property
+    def has_discount(self):
+        return bool(self.discount_price and self.discount_price < self.price)
