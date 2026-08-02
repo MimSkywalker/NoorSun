@@ -1,22 +1,26 @@
-from django.shortcuts import render
-
 from django.contrib import messages
-from django.shortcuts import get_object_or_404, redirect
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
 from django.views.generic import (
-    ListView,
-    DetailView,
     CreateView,
-    UpdateView,
     DeleteView,
+    DetailView,
+    ListView,
+    TemplateView,
+    UpdateView,
 )
 
-from .forms import ProductForm, ProductImageForm
-from .models import Product, ProductImage, Category, Brand
-
-from django.http import JsonResponse
-from django.template.loader import render_to_string
 from .filters import filter_products
+from .forms import ProductForm, ProductImageForm
+from .models import Brand, Category, Product, ProductImage
+from .services import (
+    get_bestselling_products,
+    get_discounted_products,
+    get_new_products,
+)
+
 
 # -----------------------
 # CRUD of product
@@ -141,3 +145,14 @@ class ProductImageDeleteView(DeleteView):
     def get_success_url(self):
         messages.success(self.request, "تصویر حذف شد.")
         return reverse('products:detail', kwargs={'pk': self.object.product_id})
+
+
+class HomeView(TemplateView):
+    template_name = 'products/home.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['new_products'] = get_new_products()
+        context['bestselling_products'] = get_bestselling_products()
+        context['discounted_products'] = get_discounted_products()
+        return context        
