@@ -1,0 +1,10 @@
+<section class="special-section">
+    <h2>{{ section_title }}</h2>
+    <div class="product-row">
+        {% for product in section_products %}
+            {% include 'products/_product_card.html' %}
+        {% empty %}
+            <p>محصولی موجود نیست.</p>
+        {% endfor %}
+    </div>
+</section>
