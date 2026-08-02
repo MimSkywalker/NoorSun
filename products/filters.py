@@ -3,16 +3,14 @@ from django.db.models import Q, Min
 
 def filter_products(base_queryset, params):
     """
-    Filter and sort products based on query parameters.
+    Filter and sort products based on the provided query parameters.
 
     Supported filters:
-    - Search keyword (title or description)
+    - Search keyword
     - Category
     - Brand
-    - Color
-    - Size
-    - Minimum price
-    - Maximum price
+    - Dynamic product attributes
+    - Price range
 
     Supported sorting:
     - newest (default)
@@ -27,8 +25,11 @@ def filter_products(base_queryset, params):
     Returns:
         A filtered and ordered Product queryset.
     """
+
+    # Start with active products only.
     qs = base_queryset.filter(is_active=True)
 
+    # Search by product title or description.
     q = (params.get('q') or '').strip()
     if q:
         qs = qs.filter(Q(title__icontains=q) | Q(description__icontains=q))
@@ -41,13 +42,37 @@ def filter_products(base_queryset, params):
     if brand_slug:
         qs = qs.filter(brand__slug=brand_slug)
 
-    color_id = params.get('color')
-    size_id = params.get('size')
-    if color_id:
-        qs = qs.filter(variants__attribute_values__id=color_id)
-    if size_id:
-        qs = qs.filter(variants__attribute_values__id=size_id)
 
+    # Apply dynamic attribute filters.
+    # Expected query string format:
+    # attr_<attribute_id>=<value_id>
+    # Example:
+    # ?attr_3=12&attr_3=15&attr_7=20
+    attr_filter_applied = False
+    for key in params.keys():
+        if not key.startswith('attr_'):
+            continue
+        try:
+            attribute_id = int(key.split('_', 1)[1])
+        except (ValueError, IndexError):
+            continue
+
+        value_ids = params.getlist(key) if hasattr(
+            params, 'getlist') else [params.get(key)]
+        value_ids = [v for v in value_ids if v]
+        if not value_ids:
+            continue
+
+
+        # Keep products that have at least one of the selected values
+        # for the current attribu
+        qs = qs.filter(
+            variants__attribute_values__attribute_id=attribute_id,
+            variants__attribute_values__id__in=value_ids,
+        )
+        attr_filter_applied = True
+    
+    # Filter by minimum and maximum variant price.
     min_price = params.get('min_price')
     max_price = params.get('max_price')
     if min_price:
@@ -55,8 +80,7 @@ def filter_products(base_queryset, params):
     if max_price:
         qs = qs.filter(variants__price__lte=max_price)
 
-    # Remove duplicate products caused by joins with variants.
-    if any([color_id, size_id, min_price, max_price]):
+    if attr_filter_applied or min_price or max_price:
         qs = qs.distinct()
 
     sort = params.get('sort', 'newest')
@@ -69,7 +93,6 @@ def filter_products(base_queryset, params):
     elif sort == 'bestselling':
         qs = qs.order_by('-sales_count')
     else:
-        # Default: newest products first.
         qs = qs.order_by('-created_at')
 
     return qs
