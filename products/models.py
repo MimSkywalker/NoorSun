@@ -134,6 +134,7 @@ class Product(TimeStampedModel):
         indexes = [
             models.Index(fields=['title']),
             models.Index(fields=['-created_at']),
+            models.Index(fields=['-sales_count']),
         ]
 
     def __str__(self):
@@ -142,6 +143,16 @@ class Product(TimeStampedModel):
     def clean(self):
         if self.replacement_product_id and self.replacement_product_id == self.id:
             raise ValidationError("محصول نمی‌تواند جایگزین خودش باشد.")
+
+    @property
+    def main_image(self):
+        images = list(self.images.all())
+        return images[0] if images else None
+
+    @property
+    def default_variant(self):
+        variants = list(self.variants.all())
+        return variants[0] if variants else None
 
     def save(self, *args, **kwargs):
         if not self.slug:
@@ -244,6 +255,7 @@ class ProductVariant(TimeStampedModel):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['price']),
+            models.Index(fields=['discount_price']),
         ]
 
     def __str__(self):
