@@ -14,11 +14,12 @@ from django.views.generic import (
 
 from .filters import filter_products
 from .forms import ProductForm, ProductImageForm
-from .models import Brand, Category, Product, ProductImage
+from .models import Attribute, Brand, Category, Product, ProductImage
 from .services import (
     get_bestselling_products,
     get_discounted_products,
     get_new_products,
+    get_similar_products,
 )
 
 
@@ -57,6 +58,7 @@ class ProductListView(ListView):
         }
 
         context['current_params'] = self.request.GET
+        return context
 
 
     def render_to_response(self, context, **response_kwargs):
@@ -81,6 +83,10 @@ class ProductDetailView(DetailView):
             'images', 'variants', 'variants__attribute_values'
         )
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['similar_products'] = get_similar_products(self.object)
+        return context
 
 class ProductCreateView(CreateView):
     model = Product

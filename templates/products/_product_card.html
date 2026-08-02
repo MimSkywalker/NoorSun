@@ -1,15 +1,13 @@
 {% load static %}
 <div class="product-card">
     <a href="{% url 'products:detail' product.pk %}">
-        {% with main_image=product.images.first %}
-            {% if main_image %}
-                <img src="{{ main_image.image.url }}" alt="{{ product.title }}">
-            {% else %}
-                <img src="{% static 'images/placeholder.png' %}" alt="{{ product.title }}">
-            {% endif %}
-        {% endwith %}
+        {% if product.main_image %}
+            <img src="{{ product.main_image.image.url }}" alt="{{ product.title }}">
+        {% else %}
+            <img src="{% static 'images/placeholder.png' %}" alt="{{ product.title }}">
+        {% endif %}
         <h3>{{ product.title }}</h3>
-        {% with variant=product.variants.first %}
+        {% with variant=product.default_variant %}
             {% if variant %}
                 {% if variant.has_discount %}
                     <span class="price-old">{{ variant.price }} تومان</span>

@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}صفحه‌ی اصلی{% endblock %}
+
+{% block content %}
+{% include 'products/_product_row.html' with section_title="جدیدترین‌ها" section_products=new_products %}
+{% include 'products/_product_row.html' with section_title="پرفروش‌ترین‌ها" section_products=bestselling_products %}
+{% include 'products/_product_row.html' with section_title="تخفیف‌دارها" section_products=discounted_products %}
+{% endblock %}
