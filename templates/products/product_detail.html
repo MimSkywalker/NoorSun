@@ -44,6 +44,7 @@
             <p>هنوز تنوعی برای این محصول ثبت نشده (فعلاً از پنل ادمین اضافه کن).</p>
         {% endif %}
     </div>
+    {% include 'products/_product_row.html' with section_title="محصولات مشابه" section_products=similar_products %}
 
     <a href="{% url 'products:list' %}">← بازگشت به لیست</a>
 {% endblock %}
