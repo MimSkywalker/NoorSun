@@ -12,8 +12,11 @@ from django.views.generic import (
 )
 
 from .forms import ProductForm, ProductImageForm
-from .models import Product, ProductImage
+from .models import Product, ProductImage, Category, Brand
 
+from django.http import JsonResponse
+from django.template.loader import render_to_string
+from .filters import filter_products
 
 # -----------------------
 # CRUD of product
@@ -25,7 +28,43 @@ class ProductListView(ListView):
     paginate_by = 12
 
     def get_queryset(self):
-        return Product.objects.select_related('category', 'brand').prefetch_related('images')
+        base_qs = Product.objects.select_related('category', 'brand') \
+            .prefetch_related('images', 'variants')
+        return filter_products(base_qs, self.request.GET)
+
+    def is_ajax(self):
+        return self.request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        context['categories'] = Category.objects.all()
+        context['brands'] = Brand.objects.all()
+
+        # Load all available product attributes dynamically.
+        attributes = Attribute.objects.prefetch_related('values')
+        context['attributes'] = attributes
+
+        # Store selected values for each attribute so the UI
+        # can preserve checked filters after page reload/Ajax.
+        context['selected_attrs'] = {
+            str(attr.id): self.request.GET.getlist(f'attr_{attr.id}')
+            for attr in attributes
+        }
+
+        context['current_params'] = self.request.GET
+
+
+    def render_to_response(self, context, **response_kwargs):
+        if self.is_ajax():
+            grid_html = render_to_string(
+                'products/_product_grid.html', context, request=self.request
+            )
+            return JsonResponse({
+                'html': grid_html,
+                'is_paginated': context.get('is_paginated', False),
+            })
+        return super().render_to_response(context, **response_kwargs)
 
 
 class ProductDetailView(DetailView):
