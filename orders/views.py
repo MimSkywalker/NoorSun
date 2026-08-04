@@ -1,7 +1,9 @@
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
+from django.template.loader import render_to_string
+
 from django.views.generic import TemplateView, ListView, DetailView
 from django.contrib.auth.mixins import LoginRequiredMixin
 
@@ -198,3 +200,42 @@ class OrderDetailView(LoginRequiredMixin, DetailView):
     # Prevent users from accessing other users' orders (IDOR protection)
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).prefetch_related('items')
+
+
+class OrderInvoiceView(LoginRequiredMixin, DetailView):
+    """Display order invoice as an HTML page"""
+
+    template_name = 'orders/invoice.html'
+    context_object_name = 'order'
+
+    #  Return only the current user's orders to prevent unauthorized access
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user).prefetch_related('items')
+
+
+class OrderInvoicePDFView(LoginRequiredMixin, DetailView):
+    """Generate and download order invoice as a PDF file"""
+    context_object_name = 'order'
+
+    # Return only the current user's orders to prevent IDOR vulnerabilities
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user).prefetch_related('items')
+
+    # Convert invoice HTML template into a PDF response
+    def get(self, request, *args, **kwargs):
+        # Retrieve the requested order object
+        self.object = self.get_object()
+
+        # Render invoice template as HTML string for PDF generation
+        html_string = render_to_string('orders/invoice.html', {'order': self.object, 'is_pdf': True})
+
+        # Convert HTML content into PDF using WeasyPrint
+        from weasyprint import HTML
+        pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri('/')).write_pdf()
+
+        # Return PDF file as HTTP response
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+
+        # Force browser to download the generated invoice
+        response['Content-Disposition'] = f'attachment; filename="invoice-{self.object.tracking_code}.pdf"'
+        return response
