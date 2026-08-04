@@ -168,3 +168,10 @@ LOGIN_URL = 'users:request_otp'
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
+
+
+
+# Post and Packing cost
+CART_SHIPPING_COST = env.int('CART_SHIPPING_COST', default=150000)
+CART_FREE_SHIPPING_THRESHOLD = env.int('CART_FREE_SHIPPING_THRESHOLD', default=2000000)
+CART_PACKAGING_COST = env.int('CART_PACKAGING_COST', default=50000)
