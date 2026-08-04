@@ -60,7 +60,6 @@ class ProductListView(ListView):
         context['current_params'] = self.request.GET
         return context
 
-
     def render_to_response(self, context, **response_kwargs):
         if self.is_ajax():
             grid_html = render_to_string(
@@ -88,13 +87,15 @@ class ProductDetailView(DetailView):
         context['similar_products'] = get_similar_products(self.object)
         return context
 
+
 class ProductCreateView(CreateView):
     model = Product
     form_class = ProductForm
     template_name = 'products/product_form.html'
 
     def get_success_url(self):
-        messages.success(self.request, "محصول با موفقیت ساخته شد. حالا می‌تونی عکس اضافه کنی.")
+        messages.success(
+            self.request, "محصول با موفقیت ساخته شد. حالا می‌تونی عکس اضافه کنی.")
         return reverse('products:image_add', kwargs={'product_id': self.object.pk})
 
 
@@ -161,4 +162,4 @@ class HomeView(TemplateView):
         context['new_products'] = get_new_products()
         context['bestselling_products'] = get_bestselling_products()
         context['discounted_products'] = get_discounted_products()
-        return context        
+        return context

@@ -76,7 +76,8 @@ class ProductImageInline(admin.TabularInline):
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
     extra = 1
-    fields = ('sku', 'price', 'stock', 'is_active', 'attribute_values')
+    fields = ('sku', 'price', 'discount_price',
+              'stock', 'is_active', 'attribute_values')
     filter_horizontal = ('attribute_values',)
 
 
@@ -108,11 +109,21 @@ class ProductAdmin(admin.ModelAdmin):
 # -----------------------
 # ProductVariant
 # -----------------------
+
+
 @admin.register(ProductVariant)
 class ProductVariantAdmin(admin.ModelAdmin):
-    list_display = ('sku', 'product', 'price', 'stock',
-                    'is_active', 'is_in_stock')
-    list_filter = ('is_active', 'product__category', 'product__brand')
+    list_display = (
+        'sku',
+        'product',
+        'price',
+        'discount_price',
+        'final_price',
+        'stock',
+        'is_active',
+        'is_in_stock',)
+    list_filter = ('is_active', 'product__category',
+                   'product__brand', 'discount_price')
     search_fields = ('sku', 'product__title')
     autocomplete_fields = ('product',)
     filter_horizontal = ('attribute_values',)
