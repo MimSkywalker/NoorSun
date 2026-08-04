@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('filter-form');
-    const gridWrapper = document.querySelector('main');
+    const gridWrapper = document.getElementById('product-grid-wrapper');
     let debounceTimer = null;
 
     function fetchProducts(params, pushUrl = true) {

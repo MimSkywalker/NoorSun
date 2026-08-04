@@ -5,14 +5,14 @@
     <select name="category">
         <option value="">همه‌ی دسته‌ها</option>
         {% for c in categories %}
-            <option value="{{ c.slug }}" {% if current_params.category == c.slug %}selected{% endif %}>{{ c.title }}</option>
+            <option value="{{ c.slug }}" {% if current_params.category == c.slug %}selected{% endif %}>{{ c.name }}</option>
         {% endfor %}
     </select>
 
     <select name="brand">
         <option value="">همه‌ی برندها</option>
         {% for b in brands %}
-            <option value="{{ b.slug }}" {% if current_params.brand == b.slug %}selected{% endif %}>{{ b.title }}</option>
+            <option value="{{ b.slug }}" {% if current_params.brand == b.slug %}selected{% endif %}>{{ b.name }}</option>
         {% endfor %}
     </select>
 
