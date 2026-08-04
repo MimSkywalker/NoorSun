@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}
+  سفارش {{ order.tracking_code }}
+{% endblock %}
+{% block content %}
+  <h1>سفارش {{ order.tracking_code }}</h1>
+  <p>وضعیت: {{ order.get_status_display }}</p>
+  <p>تاریخ: {{ order.created_at|date:'Y/m/d H:i' }}</p>
+
+  <h3>آدرس ارسال</h3>
+  <p>{{ order.address_receiver_name }} — {{ order.address_receiver_phone }}</p>
+  <p>{{ order.address_province_title }}، {{ order.address_city_title }} — {{ order.address_full_text }}</p>
+  <p>کد پستی: {{ order.address_postal_code }}</p>
+
+  <h3>اقلام سفارش</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>محصول</th>
+        <th>مشخصات</th>
+        <th>قیمت واحد</th>
+        <th>تعداد</th>
+        <th>جمع</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in order.items.all %}
+        <tr>
+          <td>{{ item.product_title }}</td>
+          <td>{{ item.variant_info }}</td>
+          <td>{{ item.unit_price }}</td>
+          <td>{{ item.quantity }}</td>
+          <td>{{ item.line_total }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p>جمع کالاها: {{ order.subtotal }}</p>
+  <p>هزینه‌ی ارسال: {{ order.shipping_cost }}</p>
+  <p>بسته‌بندی: {{ order.packaging_cost }}</p>
+  <p>
+    <strong>جمع کل: {{ order.total }}</strong>
+  </p>
+
+  <a href="{% url 'orders:order_invoice' order.pk %}">مشاهده‌ی فاکتور</a> |
+  <a href="{% url 'orders:order_invoice_pdf' order.pk %}">دانلود PDF فاکتور</a>
+{% endblock %}

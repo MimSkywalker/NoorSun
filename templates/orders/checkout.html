@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}تسویه‌حساب{% endblock %}
+{% block content %}
+<h1>تسویه‌حساب</h1>
+
+<h3>انتخاب آدرس</h3>
+<form method="post" action="{% url 'orders:checkout' %}">
+    {% csrf_token %}
+    {% for address in addresses %}
+    <label>
+        <input type="radio" name="address_id" value="{{ address.id }}" {% if address.is_default %}checked{% endif %}>
+        {{ address.title }} — {{ address.city.province.title }}، {{ address.city.title }} — {{ address.full_address }}
+    </label><br>
+    {% empty %}
+    <p>شما هیچ آدرسی ثبت نکرده‌اید. <a href="{% url 'addresses:create' %}">افزودن آدرس</a></p>
+    {% endfor %}
+
+    <h3>خلاصه‌ی سفارش</h3>
+    <p>جمع کالاها: {{ cart.subtotal }}</p>
+    <p>هزینه‌ی ارسال: {{ cart.shipping_cost }}</p>
+    <p>بسته‌بندی: {{ cart.packaging_cost }}</p>
+    <p><strong>جمع کل: {{ cart.total }}</strong></p>
+
+    <button type="submit" {% if not addresses %}disabled{% endif %}>ثبت نهایی سفارش</button>
+</form>
+{% endblock %}

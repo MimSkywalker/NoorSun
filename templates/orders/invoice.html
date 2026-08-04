@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>فاکتور {{ order.tracking_code }}</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: right; }
+        .totals { margin-top: 20px; text-align: left; }
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <h1>فاکتور فروش</h1>
+    <p>کد رهگیری: {{ order.tracking_code }}</p>
+    <p>تاریخ: {{ order.created_at|date:"Y/m/d H:i" }}</p>
+    <p>گیرنده: {{ order.address_receiver_name }} — {{ order.address_receiver_phone }}</p>
+    <p>آدرس: {{ order.address_province_title }}، {{ order.address_city_title }} — {{ order.address_full_text }}</p>
+
+    <table>
+        <thead>
+            <tr><th>محصول</th><th>مشخصات</th><th>قیمت واحد</th><th>تعداد</th><th>جمع</th></tr>
+        </thead>
+        <tbody>
+        {% for item in order.items.all %}
+            <tr>
+                <td>{{ item.product_title }}</td>
+                <td>{{ item.variant_info }}</td>
+                <td>{{ item.unit_price }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.line_total }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals">
+        <p>جمع کالاها: {{ order.subtotal }}</p>
+        <p>هزینه‌ی ارسال: {{ order.shipping_cost }}</p>
+        <p>بسته‌بندی: {{ order.packaging_cost }}</p>
+        <p><strong>جمع کل: {{ order.total }}</strong></p>
+    </div>
+
+    {% if not is_pdf %}
+    <button class="no-print" onclick="window.print()">چاپ</button>
+    <a class="no-print" href="{% url 'orders:order_invoice_pdf' order.pk %}">دانلود PDF</a>
+    {% endif %}
+</body>
+</html>
