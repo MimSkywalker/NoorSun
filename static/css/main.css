@@ -144,3 +144,32 @@
             border-radius: 12px;
             background: #e5e7eb;
         }
+
+.add-cart-form{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:12px;
+}
+
+.add-cart-form input{
+    width:70px;
+    padding:6px 8px;
+    border:1px solid #d1d5db;
+    border-radius:6px;
+    text-align:center;
+}
+
+.add-cart-form button{
+    border:none;
+    background:#2563eb;
+    color:#fff;
+    padding:8px 14px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.add-cart-form button:hover{
+    background:#1d4ed8;
+}

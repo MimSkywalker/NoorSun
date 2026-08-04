@@ -78,4 +78,34 @@
       {% endif %}
     {% endwith %}
   </a>
+{% with variant=product.default_variant %}
+    {% if variant %}
+        <form method="post"
+              action="{% url 'orders:cart_add' variant.id %}"
+              class="add-cart-form"
+              style="padding:12px; border-top:1px solid #e5e7eb;">
+
+            {% csrf_token %}
+
+            <input type="number"
+                   name="quantity"
+                   value="1"
+                   min="1"
+                   max="{{ variant.stock }}"
+                   style="width:60px; padding:6px;">
+
+            <button type="submit"
+                    style="padding:6px 12px;
+                           background:#2563eb;
+                           color:#fff;
+                           border:none;
+                           border-radius:6px;
+                           cursor:pointer;">
+                افزودن به سبد
+            </button>
+
+        </form>
+    {% endif %}
+{% endwith %}
+
 </div>

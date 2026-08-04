@@ -249,6 +249,25 @@
               font-size: 12px;
             ">موجودی: {{ v.stock }}</span>
             </li>
+
+            <form method="post"
+      action="{% url 'orders:cart_add' v.id %}"
+      class="add-cart-form">
+
+    {% csrf_token %}
+
+    <input
+        type="number"
+        name="quantity"
+        value="1"
+        min="1"
+        max="{{ v.stock }}">
+
+    <button type="submit">
+        افزودن به سبد
+    </button>
+
+</form>
           {% endfor %}
         </ul>
       {% else %}

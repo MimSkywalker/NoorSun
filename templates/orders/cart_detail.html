@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}سبد خرید{% endblock %}
+
+{% block content %}
+<h1>سبد خرید</h1>
+
+{% if cart.items.all %}
+<table>
+    <thead>
+        <tr>
+            <th>محصول</th>
+            <th>قیمت واحد</th>
+            <th>تعداد</th>
+            <th>جمع</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in cart.items.all %}
+        <tr>
+            <td>{{ item.variant }}</td>
+            <td>{{ item.unit_price }}</td>
+            <td>
+                <form method="post" action="{% url 'orders:cart_update_item' item.id %}">
+                    {% csrf_token %}
+                    <input type="number" name="quantity" value="{{ item.quantity }}" min="0" max="{{ item.variant.stock }}">
+                    <button type="submit">به‌روزرسانی</button>
+                </form>
+            </td>
+            <td>{{ item.line_total }}</td>
+            <td>
+                <form method="post" action="{% url 'orders:cart_remove_item' item.id %}">
+                    {% csrf_token %}
+                    <button type="submit">حذف</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<p>جمع کالاها: {{ cart.subtotal }}</p>
+<p>هزینه‌ی ارسال: {{ cart.shipping_cost }}</p>
+<p>بسته‌بندی: {{ cart.packaging_cost }}</p>
+<p><strong>جمع کل: {{ cart.total }}</strong></p>
+{% else %}
+<p>سبد خرید شما خالی است.</p>
+{% endif %}
+{% endblock %}
