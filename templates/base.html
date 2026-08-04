@@ -24,6 +24,8 @@
           <a href="{% url 'addresses:list' %}">آدرس‌ها</a>
           <a href="{% url 'users:login_password' %}">ورود با پسورد</a>
           <a href="{% url 'users:login_password' %}">بازیابی پسورد</a>
+          <a href="{% url 'products:list' %}">🛍️ فروشگاه</a>
+          <a href="{% url 'products:create' %}" class="btn">+ محصول جدید</a>
 
           <form method="post" action="{% url 'users:logout' %}" style="display:inline">
             {% csrf_token %}

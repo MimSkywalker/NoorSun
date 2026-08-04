@@ -1,19 +1,21 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 {% load static %}
 
-{% block title %}محصولات{% endblock %}
+{% block title %}
+  محصولات
+{% endblock %}
 
 {% block content %}
-<div class="product-list-page">
+  <div class="product-list-page">
     <aside>
-        {% include 'products/_filter_sidebar.html' %}
+      {% include 'products/_filter_sidebar.html' %}
     </aside>
-    <main>
-        {% include 'products/_product_grid.html' %}
-    </main>
-</div>
+    <div id="product-grid-wrapper">
+      {% include 'products/_product_grid.html' %}
+    </div>
+  </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/product_filters.js' %}"></script>
+  <script src="{% static 'js/product_filters.js' %}"></script>
 {% endblock %}
