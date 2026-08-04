@@ -1,12 +1,15 @@
 from django.contrib import messages
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, ListView, DetailView
+from django.contrib.auth.mixins import LoginRequiredMixin
+
 
 from products.models import ProductVariant
-from .models import CartItem
+from .models import CartItem, Order, create_order_from_cart, InsufficientStockError
 from .utils import get_or_create_cart
+from addresses.models import Address
 
 
 def _is_ajax(request):
@@ -119,3 +122,53 @@ class CartRemoveItemView(View):
         if _is_ajax(request):
             return _cart_json(cart)
         return redirect('orders:cart_detail')
+
+
+class CheckoutView(LoginRequiredMixin, View):
+
+    """
+    Handle checkout and order creation
+    """
+
+    template_name = 'orders/checkout.html'
+
+    # Display checkout page with active cart and saved addresses
+    def get(self, request):
+        cart = get_or_create_cart(request)
+
+        # Load addresses with related city and province in a single query
+        addresses = Address.objects.filter(
+            user=request.user).select_related('city', 'city__province')
+
+        # Prevent checkout with an empty cart
+        if not cart.items.exists():
+            messages.error(request, "سبد خرید شما خالی است.")
+            return redirect('orders:cart_detail')
+        return render(request, self.template_name, {'cart': cart, 'addresses': addresses})
+
+
+    # Create a finalized order from the current cart
+    def post(self, request):
+        cart = get_or_create_cart(request)
+        address_id = request.POST.get('address_id')
+
+        # Ensure the selected address belongs to the current user
+        address = get_object_or_404(Address, pk=address_id, user=request.user)
+
+        try:
+            order = create_order_from_cart(cart, request.user, address)
+        except InsufficientStockError as e:
+            messages.error(
+                request,
+                f"موجودی «{e.variant}» کافی نیست (موجودی فعلی: {e.available})."
+            )
+            return redirect('orders:cart_detail')
+
+        # Handle insufficient inventory
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirect('orders:cart_detail')
+
+        messages.success(
+            request, f"سفارش شما با کد رهگیری {order.tracking_code} ثبت شد.")
+        return redirect('orders:order_detail', pk=order.pk)
