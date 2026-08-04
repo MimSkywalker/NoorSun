@@ -146,8 +146,8 @@ class CheckoutView(LoginRequiredMixin, View):
             return redirect('orders:cart_detail')
         return render(request, self.template_name, {'cart': cart, 'addresses': addresses})
 
-
     # Create a finalized order from the current cart
+
     def post(self, request):
         cart = get_or_create_cart(request)
         address_id = request.POST.get('address_id')
@@ -172,3 +172,29 @@ class CheckoutView(LoginRequiredMixin, View):
         messages.success(
             request, f"سفارش شما با کد رهگیری {order.tracking_code} ثبت شد.")
         return redirect('orders:order_detail', pk=order.pk)
+
+
+class OrderListView(LoginRequiredMixin, ListView):
+
+    """Display the current user's order history"""
+
+    template_name = 'orders/order_list.html'
+    context_object_name = 'orders'
+    paginate_by = 10
+
+    # Return only the authenticated user's orders
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user).prefetch_related('items')
+
+
+class OrderDetailView(LoginRequiredMixin, DetailView):
+    """
+    Display details of a single order
+    """
+
+    template_name = 'orders/order_detail.html'
+    context_object_name = 'order'
+
+    # Prevent users from accessing other users' orders (IDOR protection)
+    def get_queryset(self):
+        return Order.objects.filter(user=self.request.user).prefetch_related('items')
