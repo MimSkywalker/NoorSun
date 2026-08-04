@@ -18,6 +18,8 @@ from .forms import PhoneNumberForm, OTPVerifyForm, SetNewPasswordForm, EmailPass
 from .models import OTPRequest
 from .services import sms_service
 
+from orders.utils import merge_guest_cart_into_user
+
 User = get_user_model()
 
 
@@ -124,6 +126,7 @@ class VerifyOTPView(View):
             user.save(update_fields=['is_phone_verified'])
 
         login(request, user)
+        merge_guest_cart_into_user(request, user)
         request.session.pop(SESSION_PHONE_KEY, None)
 
         if created:
@@ -277,6 +280,7 @@ class PasswordResetSetNewView(View):
 
         request.session.pop(SESSION_PWRESET_VERIFIED_KEY, None)
         login(request, user)
+        merge_guest_cart_into_user(request, user)
         messages.success(request, "رمز عبور تغییر کرد. اکنون وارد شوید.")
         return redirect(reverse('profiles:detail'))
 
@@ -348,6 +352,7 @@ class EmailPasswordResetConfirmView(View):
         user.set_password(form.cleaned_data['new_password1'])
         user.save(update_fields=['password'])
         login(request, user)
+        merge_guest_cart_into_user(request, user)
         messages.success(request, "رمز عبور تغییر کرد. اکنون وارد شوید.")
         return redirect(reverse('profiles:detail'))
 
@@ -379,6 +384,7 @@ class RegisterWithPasswordView(View):
         user.save(update_fields=['is_phone_verified'])
 
         login(request, user)
+        merge_guest_cart_into_user(request, user)
         messages.success(
             request,
             "ثبت‌نام با موفقیت انجام شد. توصیه می‌شود در فرصتی مناسب شماره‌ی خود را با پیامک نیز تأیید کنید."
@@ -407,5 +413,6 @@ class PhoneLoginView(View):
             return render(request, self.template_name, {'form': form})
 
         login(request, user)
+        merge_guest_cart_into_user(request, user)
         messages.success(request, "با موفقیت وارد شدید.")
         return redirect(reverse('profiles:detail'))
