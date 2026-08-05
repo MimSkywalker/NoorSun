@@ -26,13 +26,18 @@ def filter_products(base_queryset, params):
         A filtered and ordered Product queryset.
     """
 
-    # Start with active products only.
-    qs = base_queryset.filter(is_active=True)
+    qs = base_queryset
 
-    # Search by product title or description.
-    q = (params.get('q') or '').strip()
-    if q:
-        qs = qs.filter(Q(title__icontains=q) | Q(description__icontains=q))
+    query = params.get('q', '').strip()
+
+    if query:
+        # Explicit text search: inactive products should also be searchable.
+        qs = qs.filter(
+            Q(title__icontains=query) | Q(description__icontains=query)
+        )
+    else:
+        # Normal browsing without a search query: show only active products.
+        qs = qs.filter(is_active=True)
 
     category_slug = params.get('category')
     if category_slug:
@@ -41,7 +46,6 @@ def filter_products(base_queryset, params):
     brand_slug = params.get('brand')
     if brand_slug:
         qs = qs.filter(brand__slug=brand_slug)
-
 
     # Apply dynamic attribute filters.
     # Expected query string format:
@@ -63,15 +67,14 @@ def filter_products(base_queryset, params):
         if not value_ids:
             continue
 
-
         # Keep products that have at least one of the selected values
-        # for the current attribu
+        # for the current attribute.
         qs = qs.filter(
             variants__attribute_values__attribute_id=attribute_id,
             variants__attribute_values__id__in=value_ids,
         )
         attr_filter_applied = True
-    
+
     # Filter by minimum and maximum variant price.
     min_price = params.get('min_price')
     max_price = params.get('max_price')
@@ -85,11 +88,13 @@ def filter_products(base_queryset, params):
 
     sort = params.get('sort', 'newest')
     if sort == 'cheapest':
-        qs = qs.annotate(_min_price=Min('variants__price')
-                         ).order_by('_min_price')
+        qs = qs.annotate(
+            _min_price=Min('variants__price')
+        ).order_by('_min_price')
     elif sort == 'expensive':
-        qs = qs.annotate(_min_price=Min('variants__price')
-                         ).order_by('-_min_price')
+        qs = qs.annotate(
+            _min_price=Min('variants__price')
+        ).order_by('-_min_price')
     elif sort == 'bestselling':
         qs = qs.order_by('-sales_count')
     else:

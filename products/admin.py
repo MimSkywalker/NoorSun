@@ -75,9 +75,15 @@ class ProductImageInline(admin.TabularInline):
 
 class ProductVariantInline(admin.TabularInline):
     model = ProductVariant
-    extra = 1
-    fields = ('sku', 'price', 'discount_price',
-              'stock', 'is_active', 'attribute_values')
+    extra = 0
+    fields = (
+        'sku',
+        'price',
+        'discount_price',
+        'stock',
+        'is_active',
+        'attribute_values',
+    )
     filter_horizontal = ('attribute_values',)
 
 

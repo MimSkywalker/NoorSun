@@ -193,7 +193,18 @@
       padding-right: 10px;
     ">تنوع‌ها (Variants)</h3>
 
-      {% if product.variants.all %}
+      {% if is_unavailable %}
+        <div class="unavailable-notice">
+          <p>⚠️ این محصول در حال حاضر ناموجود است.</p>
+
+          {% if product.replacement_product %}
+            <p>
+              می‌توانید محصول جایگزین را مشاهده کنید:
+              <a href="{% url 'products:detail' product.replacement_product.pk %}">{{ product.replacement_product.title }}</a>
+            </p>
+          {% endif %}
+        </div>
+      {% elif product.variants.all %}
         <ul style="
         list-style: none;
         padding: 0;
@@ -250,24 +261,13 @@
             ">موجودی: {{ v.stock }}</span>
             </li>
 
-            <form method="post"
-      action="{% url 'orders:cart_add' v.id %}"
-      class="add-cart-form">
+            <form method="post" action="{% url 'orders:cart_add' v.id %}" class="add-cart-form">
+              {% csrf_token %}
 
-    {% csrf_token %}
+              <input type="number" name="quantity" value="1" min="1" max="{{ v.stock }}" />
 
-    <input
-        type="number"
-        name="quantity"
-        value="1"
-        min="1"
-        max="{{ v.stock }}">
-
-    <button type="submit">
-        افزودن به سبد
-    </button>
-
-</form>
+              <button type="submit">افزودن به سبد</button>
+            </form>
           {% endfor %}
         </ul>
       {% else %}

@@ -9,7 +9,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 
 
 from products.models import ProductVariant
-from .models import CartItem, Order, create_order_from_cart, InsufficientStockError
+from .models import CartItem, Order, create_order_from_cart, InsufficientStockError, ProductInactiveError
 from .utils import get_or_create_cart
 from addresses.models import Address
 
@@ -48,6 +48,12 @@ class CartAddView(View):
 
         # Get the selected product variant
         variant = get_object_or_404(ProductVariant, pk=variant_id)
+
+        if not variant.product.is_active:
+            messages.error(request, "این محصول در حال حاضر ناموجود است.")
+            if _is_ajax(request):
+                return JsonResponse({'error': True, 'message': 'محصول ناموجود است.'})
+            return redirect('products:detail', pk=variant.product.pk)
 
         # Ensure a valid quantity
         try:
@@ -155,10 +161,25 @@ class CheckoutView(LoginRequiredMixin, View):
         address_id = request.POST.get('address_id')
 
         # Ensure the selected address belongs to the current user
-        address = get_object_or_404(Address, pk=address_id, user=request.user)
+        address = get_object_or_404(
+            Address,
+            pk=address_id,
+            user=request.user
+        )
 
         try:
             order = create_order_from_cart(cart, request.user, address)
+
+        except ProductInactiveError as e:
+            messages.error(
+                request,
+                f"محصول «{e.product}» دیگر موجود نیست و از سبد شما حذف خواهد شد."
+            )
+            cart.items.filter(
+                variant__product=e.product
+            ).delete()
+            return redirect('orders:cart_detail')
+
         except InsufficientStockError as e:
             messages.error(
                 request,
@@ -166,13 +187,14 @@ class CheckoutView(LoginRequiredMixin, View):
             )
             return redirect('orders:cart_detail')
 
-        # Handle insufficient inventory
         except ValueError as e:
             messages.error(request, str(e))
             return redirect('orders:cart_detail')
 
         messages.success(
-            request, f"سفارش شما با کد رهگیری {order.tracking_code} ثبت شد.")
+            request,
+            f"سفارش شما با کد رهگیری {order.tracking_code} ثبت شد."
+        )
         return redirect('orders:order_detail', pk=order.pk)
 
 

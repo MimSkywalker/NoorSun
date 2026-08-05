@@ -85,6 +85,7 @@ class ProductDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['similar_products'] = get_similar_products(self.object)
+        context['is_unavailable'] = not self.object.is_active
         return context
 
 

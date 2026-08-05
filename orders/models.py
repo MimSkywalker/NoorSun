@@ -104,6 +104,8 @@ class CartItem(TimeStampedModel):
         return self.unit_price * self.quantity
 
 # Generate a unique order tracking code
+
+
 def generate_tracking_code():
 
     date_part = date.today().strftime('%Y%m%d')
@@ -207,9 +209,18 @@ class InsufficientStockError(Exception):
         super().__init__(f"موجودی کافی نیست برای {variant}")
 
 
+class ProductInactiveError(Exception):
+    """
+    Raised when a product in the cart is no longer active.
+    """
+
+    def __init__(self, product):
+        self.product = product
+        super().__init__(f"محصول {product} غیرفعال است.")
+
+
 @transaction.atomic
 def create_order_from_cart(cart, user, address):
-
     """
     Finalize the shopping cart by:
     - validating stock
@@ -228,9 +239,13 @@ def create_order_from_cart(cart, user, address):
     if not items:
         raise ValueError("سبد خرید خالی است.")
 
-   
+    # Final validation of product availability and stock before making any changes.
     for item in items:
         variant = ProductVariant.objects.select_for_update().get(pk=item.variant_id)
+
+        if not variant.product.is_active:
+            raise ProductInactiveError(variant.product)
+
         if variant.stock < item.quantity:
             raise InsufficientStockError(variant, variant.stock)
 
