@@ -1,21 +1,47 @@
-{% extends "base.html" %}
-{% block title %}سفارش‌های من{% endblock %}
+{% extends 'base.html' %}
+{% block title %}
+  سفارش‌های من
+{% endblock %}
 {% block content %}
-<h1>سفارش‌های من</h1>
-<table>
-    <thead><tr><th>کد رهگیری</th><th>تاریخ</th><th>وضعیت</th><th>مبلغ کل</th><th></th></tr></thead>
+  <h1>سفارش‌های من</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>کد رهگیری</th>
+        <th>تاریخ</th>
+        <th>وضعیت</th>
+        <th>مبلغ کل</th>
+        <th></th>
+      </tr>
+    </thead>
     <tbody>
-    {% for order in orders %}
+      {% for order in orders %}
         <tr>
-            <td>{{ order.tracking_code }}</td>
-            <td>{{ order.created_at|date:"Y/m/d H:i" }}</td>
-            <td>{{ order.get_status_display }}</td>
-            <td>{{ order.total }}</td>
-            <td><a href="{% url 'orders:order_detail' order.pk %}">جزئیات</a></td>
+          <td>{{ order.tracking_code }}</td>
+          <td>{{ order.created_at|date:'Y/m/d H:i' }}</td>
+          <td>{{ order.get_status_display }}</td>
+          <td>{{ order.total }}</td>
+          <td>
+            <a href="{% url 'orders:order_detail' order.pk %}">جزئیات</a>
+          </td>
         </tr>
-    {% empty %}
-        <tr><td colspan="5">هنوز سفارشی ثبت نکرده‌اید.</td></tr>
-    {% endfor %}
+      {% empty %}
+        <tr>
+          <td colspan="5">هنوز سفارشی ثبت نکرده‌اید.</td>
+        </tr>
+      {% endfor %}
     </tbody>
-</table>
+  </table>
+
+  {% if is_paginated %}
+    <div class="pagination" id="product-pagination">
+      {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}" class="page-link">قبلی</a>
+      {% endif %}
+      <span>صفحه {{ page_obj.number }} از {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}" class="page-link">بعدی</a>
+      {% endif %}
+    </div>
+  {% endif %}
 {% endblock %}

@@ -26,6 +26,8 @@
           <a href="{% url 'users:login_password' %}">بازیابی پسورد</a>
           <a href="{% url 'products:list' %}">🛍️ فروشگاه</a>
           <a href="{% url 'products:create' %}" class="btn">+ محصول جدید</a>
+          <a href="{% url 'orders:cart_detail' %}" class="btn">سبد خرید</a>
+          <a href="{% url 'orders:checkout' %}" class="btn">تسویه</a>
 
           <form method="post" action="{% url 'users:logout' %}" style="display:inline">
             {% csrf_token %}
