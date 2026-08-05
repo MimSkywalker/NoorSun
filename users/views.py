@@ -125,8 +125,10 @@ class VerifyOTPView(View):
             user.is_phone_verified = True
             user.save(update_fields=['is_phone_verified'])
 
+        guest_session_key = request.session.session_key
         login(request, user)
-        merge_guest_cart_into_user(request, user)
+        merge_guest_cart_into_user(
+            request, user, guest_session_key=guest_session_key)
         request.session.pop(SESSION_PHONE_KEY, None)
 
         if created:
@@ -185,8 +187,6 @@ class PasswordResetRequestOTPView(View):
         phone_number = form.cleaned_data['phone_number']
 
         if not User.objects.filter(phone_number=phone_number).exists():
-            # پیام یکسان با حالت موفق، تا این فرم برای کشف وجود/عدم‌وجود
-            # یک شماره در سیستم قابل سوءاستفاده نباشه.
             messages.success(
                 request, "در صورت وجود این شماره در سیستم، کد ارسال شد.")
             return redirect(reverse('users:password_reset_verify_otp'))
@@ -279,8 +279,11 @@ class PasswordResetSetNewView(View):
         user.save(update_fields=['password'])
 
         request.session.pop(SESSION_PWRESET_VERIFIED_KEY, None)
+
+        guest_session_key = request.session.session_key
         login(request, user)
-        merge_guest_cart_into_user(request, user)
+        merge_guest_cart_into_user(
+            request, user, guest_session_key=guest_session_key)
         messages.success(request, "رمز عبور تغییر کرد. اکنون وارد شوید.")
         return redirect(reverse('profiles:detail'))
 
@@ -351,8 +354,10 @@ class EmailPasswordResetConfirmView(View):
 
         user.set_password(form.cleaned_data['new_password1'])
         user.save(update_fields=['password'])
+        guest_session_key = request.session.session_key
         login(request, user)
-        merge_guest_cart_into_user(request, user)
+        merge_guest_cart_into_user(
+            request, user, guest_session_key=guest_session_key)
         messages.success(request, "رمز عبور تغییر کرد. اکنون وارد شوید.")
         return redirect(reverse('profiles:detail'))
 
@@ -383,8 +388,10 @@ class RegisterWithPasswordView(View):
         user.is_phone_verified = False
         user.save(update_fields=['is_phone_verified'])
 
+        guest_session_key = request.session.session_key
         login(request, user)
-        merge_guest_cart_into_user(request, user)
+        merge_guest_cart_into_user(
+            request, user, guest_session_key=guest_session_key)
         messages.success(
             request,
             "ثبت‌نام با موفقیت انجام شد. توصیه می‌شود در فرصتی مناسب شماره‌ی خود را با پیامک نیز تأیید کنید."
@@ -412,7 +419,9 @@ class PhoneLoginView(View):
             messages.error(request, "شماره موبایل یا رمز عبور اشتباه است.")
             return render(request, self.template_name, {'form': form})
 
+        guest_session_key = request.session.session_key
         login(request, user)
-        merge_guest_cart_into_user(request, user)
+        merge_guest_cart_into_user(
+            request, user, guest_session_key=guest_session_key)
         messages.success(request, "با موفقیت وارد شدید.")
         return redirect(reverse('profiles:detail'))
