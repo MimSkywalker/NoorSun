@@ -3,6 +3,9 @@ from django.db.models import F
 
 from .models import Cart, CartItem, Order, ProductVariant
 from products.models import Product
+from django.utils import timezone
+from datetime import timedelta
+from django.conf import settings
 
 
 def get_or_create_cart(request):
@@ -140,3 +143,24 @@ def release_order_stock(order_id, new_status):
         order.status = new_status
         order.save(update_fields=['status', 'updated_at'])
         return True
+
+
+def check_and_expire_order(order):
+    """
+    Lazily expire an unpaid order after the configured payment timeout.
+
+    Uses the idempotent stock-release function, making repeated calls safe.
+    """
+    # Only pending payments can expire.
+    if order.status != Order.Status.PENDING_PAYMENT:
+        return order
+
+    # Check whether the payment window has expired.
+    timeout = timedelta(minutes=settings.ORDER_PAYMENT_TIMEOUT_MINUTES)
+    if timezone.now() - order.created_at > timeout:
+        release_order_stock(order.pk, Order.Status.EXPIRED)
+
+        # Reload the order to reflect the updated status.
+        order.refresh_from_db()
+
+    return order

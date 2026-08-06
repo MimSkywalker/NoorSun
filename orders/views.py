@@ -1,17 +1,33 @@
 from django.contrib import messages
-from django.http import JsonResponse, HttpResponse
-from django.shortcuts import get_object_or_404, redirect, render
-from django.views import View
-from django.template.loader import render_to_string
-
-from django.views.generic import TemplateView, ListView, DetailView
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
+from django.urls import reverse
+from django.utils import timezone
+from django.views import View
+from django.views.generic import DetailView, ListView, TemplateView
 
-
-from products.models import ProductVariant
-from .models import CartItem, Order, create_order_from_cart, InsufficientStockError, ProductInactiveError, VariantInactiveError
-from .utils import get_or_create_cart
 from addresses.models import Address
+from products.models import ProductVariant
+
+from .gateways import get_gateway
+from .models import (
+    CartItem,
+    InsufficientStockError,
+    Order,
+    Payment,
+    ProductInactiveError,
+    VariantInactiveError,
+    create_order_from_cart,
+)
+
+from .utils import (
+    check_and_expire_order,
+    get_or_create_cart,
+    release_order_stock,
+)
 
 
 def _is_ajax(request):
@@ -108,7 +124,8 @@ class CartUpdateItemView(View):
         else:
             is_unavailable = not item.variant.product.is_active or not item.variant.is_active
             if is_unavailable and quantity > item.quantity:
-                messages.error(request, "این کالا دیگر قابل خرید نیست و نمی‌توانید تعدادش را افزایش دهید.")
+                messages.error(
+                    request, "این کالا دیگر قابل خرید نیست و نمی‌توانید تعدادش را افزایش دهید.")
                 if _is_ajax(request):
                     return _cart_json(cart, error=True)
                 return redirect('orders:cart_detail')
@@ -232,13 +249,17 @@ class OrderDetailView(LoginRequiredMixin, DetailView):
     """
     Display details of a single order
     """
-
+    model = Order
     template_name = 'orders/order_detail.html'
     context_object_name = 'order'
 
     # Prevent users from accessing other users' orders (IDOR protection)
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).prefetch_related('items')
+
+    def get_object(self, queryset=None):
+        order = super().get_object(queryset)
+        return check_and_expire_order(order)
 
 
 class OrderInvoiceView(LoginRequiredMixin, DetailView):
@@ -266,11 +287,13 @@ class OrderInvoicePDFView(LoginRequiredMixin, DetailView):
         self.object = self.get_object()
 
         # Render invoice template as HTML string for PDF generation
-        html_string = render_to_string('orders/invoice.html', {'order': self.object, 'is_pdf': True})
+        html_string = render_to_string(
+            'orders/invoice.html', {'order': self.object, 'is_pdf': True})
 
         # Convert HTML content into PDF using WeasyPrint
         from weasyprint import HTML
-        pdf_file = HTML(string=html_string, base_url=request.build_absolute_uri('/')).write_pdf()
+        pdf_file = HTML(string=html_string,
+                        base_url=request.build_absolute_uri('/')).write_pdf()
 
         # Return PDF file as HTTP response
         response = HttpResponse(pdf_file, content_type='application/pdf')
@@ -278,3 +301,186 @@ class OrderInvoicePDFView(LoginRequiredMixin, DetailView):
         # Force browser to download the generated invoice
         response['Content-Disposition'] = f'attachment; filename="invoice-{self.object.tracking_code}.pdf"'
         return response
+
+
+class PaymentInitiateView(LoginRequiredMixin, View):
+    """
+    Starts a new payment attempt for an order.
+
+    Failed attempts remain in the payment history, while each retry
+    creates a new Payment record.
+    """
+
+    def get(self, request, pk):
+        order = get_object_or_404(Order, pk=pk, user=request.user)
+        order = check_and_expire_order(order)
+
+        if order.status == Order.Status.EXPIRED:
+            messages.error(
+                request,
+                "زمان پرداخت این سفارش به پایان رسیده و لغو شد.",
+            )
+            return redirect("orders:detail", pk=order.pk)
+
+        if order.status != Order.Status.PENDING_PAYMENT:
+            messages.info(request, "این سفارش قبلاً پردازش شده است.")
+            return redirect("orders:detail", pk=order.pk)
+
+        payment = Payment.objects.create(
+            order=order,
+            gateway=settings.PAYMENT_GATEWAY,
+            amount=order.total,
+            status=Payment.Status.PENDING,
+        )
+
+        # Use the configured gateway to start the payment.
+        gateway = get_gateway()
+        result = gateway.request_payment(payment)
+
+        if not result.success:
+            payment.status = Payment.Status.FAILED
+            payment.raw_response = {"error": result.error_message}
+            payment.save(update_fields=["status", "raw_response"])
+
+            messages.error(
+                request,
+                "اتصال به درگاه پرداخت با خطا مواجه شد. دوباره تلاش کنید.",
+            )
+            return redirect("orders:detail", pk=order.pk)
+
+        # Store the gateway authority for the callback and verification step.
+        payment.authority = result.authority or ""
+        payment.save(update_fields=["authority"])
+
+        return redirect(result.redirect_url)
+
+
+class FakeGatewayView(LoginRequiredMixin, View):
+    """
+    Simulates a payment gateway for development and testing.
+
+    It uses the same callback flow as a real gateway without making
+    external requests.
+    """
+
+    def get(self, request, payment_id):
+        payment = get_object_or_404(
+            Payment,
+            pk=payment_id,
+            order__user=request.user,
+            status=Payment.Status.PENDING,
+        )
+        return render(
+            request,
+            "orders/fake_gateway.html",
+            {"payment": payment},
+        )
+
+    def post(self, request, payment_id):
+        payment = get_object_or_404(
+            Payment,
+            pk=payment_id,
+            order__user=request.user,
+            status=Payment.Status.PENDING,
+        )
+
+        # Simulate the gateway result selected by the user.
+        result = request.POST.get("result")
+
+        callback_url = reverse("orders:payment_callback")
+        return redirect(
+            f"{callback_url}?authority={payment.authority}&result={result}"
+        )
+
+
+class PaymentCallbackView(View):
+    """
+    Handles the payment gateway callback.
+
+    Payment verification is delegated to the configured gateway implementation.
+    The callback is idempotent and ignores already finalized payments.
+    """
+
+    def get(self, request):
+        authority = request.GET.get("authority")
+        payment = get_object_or_404(Payment, authority=authority)
+
+        with transaction.atomic():
+            payment = Payment.objects.select_for_update().get(pk=payment.pk)
+
+            if payment.status != Payment.Status.PENDING:
+                # Ignore duplicate callbacks for finalized payments.
+                return self._redirect_result(payment)
+
+            order = Order.objects.select_for_update().get(pk=payment.order_id)
+
+            if order.status != Order.Status.PENDING_PAYMENT:
+                # The order was finalized concurrently, so this payment is no longer valid.
+                payment.status = Payment.Status.FAILED
+                payment.raw_response = {"error": "order_no_longer_pending"}
+                payment.save(update_fields=["status", "raw_response"])
+                messages.error(request, "زمان این سفارش به پایان رسیده بود.")
+                return redirect("orders:detail", pk=order.pk)
+
+            # Always verify through the gateway stored on the Payment.
+            gateway = get_gateway(payment.gateway)
+            verify_result = gateway.verify_payment(payment, request.GET.dict())
+
+            if verify_result.success:
+                payment.status = Payment.Status.SUCCESS
+                payment.ref_id = verify_result.ref_id or ""
+                payment.raw_response = verify_result.raw_response
+                payment.paid_at = timezone.now()
+                payment.save(
+                    update_fields=[
+                        "status",
+                        "ref_id",
+                        "raw_response",
+                        "paid_at",
+                    ]
+                )
+
+                order.status = Order.Status.PROCESSING
+                order.save(update_fields=["status", "updated_at"])
+
+                messages.success(
+                    request,
+                    f"پرداخت با موفقیت انجام شد. کد پیگیری: {order.tracking_code}",
+                )
+            else:
+                payment.status = Payment.Status.FAILED
+                payment.raw_response = verify_result.raw_response
+                payment.save(update_fields=["status", "raw_response"])
+
+                # Keep the order pending so the customer can retry payment.
+                messages.error(
+                    request,
+                    verify_result.error_message or "پرداخت ناموفق بود.",
+                )
+
+        return redirect("orders:detail", pk=payment.order_id)
+
+    def _redirect_result(self, payment):
+        return redirect("orders:detail", pk=payment.order_id)
+
+
+class PaymentCancelView(LoginRequiredMixin, View):
+    """
+    Handles manual payment cancellation before the payment timeout.
+
+    Stock release is delegated to the shared idempotent helper.
+    """
+
+    def post(self, request, pk):
+        order = get_object_or_404(Order, pk=pk, user=request.user)
+        released = release_order_stock(order.pk, Order.Status.CANCELED)
+
+        if released:
+            messages.success(request, "سفارش لغو شد و موجودی کالاها آزاد شد.")
+        else:
+            messages.info(
+                request,
+                "این سفارش دیگر قابل لغو نیست (احتمالاً پرداخت شده یا قبلاً لغو شده).",
+            )
+
+        return redirect("orders:detail", pk=order.pk)
