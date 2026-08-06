@@ -125,6 +125,7 @@ class Order(TimeStampedModel):
         SHIPPED = 'shipped', 'ارسال شده'
         DELIVERED = 'delivered', 'تحویل داده شده'
         CANCELLED = 'cancelled', 'لغو شده'
+        EXPIRED = 'expired', 'منقضی شده' 
 
     # Order owner
     user = models.ForeignKey(
@@ -298,3 +299,33 @@ def create_order_from_cart(cart, user, address):
     cart.save(update_fields=['is_active'])
 
     return order
+
+
+
+class Payment(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'در انتظار'
+        SUCCESS = 'success', 'موفق'
+        FAILED = 'failed', 'ناموفق'
+
+    order = models.ForeignKey(
+        Order, on_delete=models.PROTECT, related_name='payments'
+    )
+    gateway = models.CharField(max_length=30)
+    amount = models.DecimalField(max_digits=12, decimal_places=0) 
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.PENDING
+    )
+    authority = models.CharField(max_length=100, blank=True, db_index=True)
+    ref_id = models.CharField(max_length=100, blank=True)
+    raw_response = models.JSONField(blank=True, null=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['authority']),
+            models.Index(fields=['order', 'status']),
+        ]
+
+    def __str__(self):
+        return f'Payment #{self.pk} - {self.order.tracking_code} - {self.get_status_display()}'
