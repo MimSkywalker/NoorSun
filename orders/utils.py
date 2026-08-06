@@ -1,4 +1,7 @@
-from .models import Cart, CartItem
+from .models import Cart, CartItem, Order, ProductVariant 
+from django.db import transaction
+from django.db.models import F
+
 
 
 def get_or_create_cart(request):
@@ -98,3 +101,39 @@ def merge_guest_cart_into_user(request, user, guest_session_key=None):
 
     # Remove the guest cart after all of its items have been merged.
     guest_cart.delete()
+
+
+
+def release_order_stock(order_id, new_status):
+    """
+    Idempotently releases the stock reserved for an order, restores the
+    corresponding sales_count, and updates the order status.
+
+    This function only operates when the order is still in PENDING_PAYMENT
+    status. If the order has already been processed, it returns False without
+    making any changes.
+
+    The row-level lock ensures that concurrent operations such as a successful
+    PaymentCallbackView, manual cancellation, automatic expiration via a
+    management command, or a lazy expiration check cannot process the same
+    order simultaneously. Only one operation can successfully release the
+    stock and change the status.
+    """
+    with transaction.atomic():
+        try:
+            order = Order.objects.select_for_update().get(pk=order_id)
+        except Order.DoesNotExist:
+            return False
+
+        if order.status != Order.Status.PENDING_PAYMENT:
+            return False  # The order has already been processed (successful, expired, or canceled).
+
+                    stock=F('stock') + item.quantity
+                )
+                Product.objects.filter(pk=item.variant.product_id).update(
+                    sales_count=F('sales_count') - item.quantity
+                )
+
+        order.status = new_status
+        order.save(update_fields=['status', 'updated_at'])
+        return True
