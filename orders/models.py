@@ -339,3 +339,30 @@ class Payment(TimeStampedModel):
         return f'Payment #{self.pk} - {self.order.tracking_code} - {self.get_status_display()}'
 
 
+class RefundRequest(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'در انتظار بررسی'
+        APPROVED = 'approved', 'تأیید شده'
+        REJECTED = 'rejected', 'رد شده'
+        DONE = 'done', 'انجام شده'
+
+    order = models.ForeignKey(
+        Order, on_delete=models.PROTECT, related_name='refund_requests'
+    )
+    payment = models.ForeignKey(
+        Payment, on_delete=models.PROTECT, null=True, blank=True,
+        related_name='refund_requests'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='refund_requests'
+    )
+    reason = models.TextField()
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.PENDING
+    )
+    admin_note = models.TextField(blank=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f'RefundRequest #{self.pk} - {self.order.tracking_code}'

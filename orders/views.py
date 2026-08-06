@@ -4,10 +4,10 @@ from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views import View
-from django.views.generic import DetailView, ListView, TemplateView
+from django.views.generic import DetailView, ListView, TemplateView, CreateView
 
 from addresses.models import Address
 from products.models import ProductVariant
@@ -19,6 +19,7 @@ from .models import (
     Order,
     Payment,
     ProductInactiveError,
+    RefundRequest,
     VariantInactiveError,
     create_order_from_cart,
 )
@@ -225,11 +226,8 @@ class CheckoutView(LoginRequiredMixin, View):
             messages.error(request, str(e))
             return redirect('orders:cart_detail')
 
-        messages.success(
-            request,
-            f"سفارش شما با کد رهگیری {order.tracking_code} ثبت شد."
-        )
-        return redirect('orders:order_detail', pk=order.pk)
+        # After creating the order, start the payment process directly.
+        return redirect('orders:payment_initiate', pk=order.pk)
 
 
 class OrderListView(LoginRequiredMixin, ListView):
@@ -484,3 +482,75 @@ class PaymentCancelView(LoginRequiredMixin, View):
             )
 
         return redirect("orders:detail", pk=order.pk)
+
+
+class RefundRequestCreateView(LoginRequiredMixin, CreateView):
+    # Create a refund request using the RefundRequest model.
+    model = RefundRequest
+
+    # The user is only allowed to submit the refund reason.
+    # Sensitive fields such as order, payment, and user are set server-side.
+    fields = ['reason']
+
+    # Template used to display the refund request form.
+    template_name = 'orders/refund_request_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        # Retrieve the requested order while ensuring that:
+        # 1. The order belongs to the currently authenticated user.
+        # 2. The order is in a status that allows a refund request.
+        #
+        # Checking user=request.user also prevents IDOR attacks,
+        # because a user cannot access another user's order by changing order_id.
+        self.order = get_object_or_404(
+            Order,
+            pk=kwargs['order_id'],
+            user=request.user,
+            status__in=[Order.Status.PROCESSING,
+                        Order.Status.SHIPPED, Order.Status.DELIVERED],
+        )
+
+        # Only orders with at least one successful payment
+        # are eligible for a refund request.
+        #
+        # If multiple successful payments exist, use the most recent
+        # successful payment based on paid_at.
+        self.successful_payment = self.order.payments.filter(
+            status=Payment.Status.SUCCESS
+        ).order_by('-paid_at').first()
+
+        # Do not allow a refund request if no successful payment exists.
+        if not self.successful_payment:
+            messages.error(
+                request, "برای این سفارش پرداخت موفقی ثبت نشده است.")
+            return redirect('orders:detail', pk=self.order.pk)
+
+        # Continue with the normal CreateView processing
+        # after all authorization and payment checks have passed.
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        # Set the order server-side instead of accepting it from the user.
+        # This prevents the user from attaching the refund request
+        # to a different order.
+        form.instance.order = self.order
+
+        # Associate the refund request with the verified successful payment.
+        # This value is also controlled by the server.
+        form.instance.payment = self.successful_payment
+
+        # Associate the refund request with the currently authenticated user.
+        # The user cannot choose or modify this value through the form.
+        form.instance.user = self.request.user
+
+        # Inform the user that the refund request was successfully created.
+        messages.success(
+            self.request, "درخواست بازگشت وجه شما ثبت شد و در حال بررسی است.")
+
+        # Save the RefundRequest and continue the normal CreateView flow.
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        # After successfully creating the refund request,
+        # redirect the user back to the order detail page.
+        return reverse_lazy('orders:detail', kwargs={'pk': self.order.pk})

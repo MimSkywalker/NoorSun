@@ -47,4 +47,6 @@ urlpatterns = [
         views.OrderInvoicePDFView.as_view(),
         name='order_invoice_pdf',
     ),
+
+    path('<int:order_id>/refund/request/', views.RefundRequestCreateView.as_view(), name='refund_request'),
 ]
