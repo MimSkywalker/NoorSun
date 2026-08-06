@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}صفحه‌ی شبیه‌سازی درگاه پرداخت{% endblock %}
+
+{% block content %}
+<div class="fake-gateway-box">
+    <div class="fake-gateway-warning">
+        ⚠️ این یک درگاه واقعی نیست — صرفاً برای تست محیط توسعه است.
+    </div>
+
+    <h2>پرداخت سفارش</h2>
+    <p><strong>کد پیگیری:</strong> {{ payment.order.tracking_code }}</p>
+    <p><strong>مبلغ قابل پرداخت:</strong> {{ payment.amount|floatformat:0 }} تومان</p>
+
+    <form method="post" class="fake-gateway-actions">
+        {% csrf_token %}
+        <button type="submit" name="result" value="success" class="btn btn-success">
+            ✅ شبیه‌سازی پرداخت موفق
+        </button>
+        <button type="submit" name="result" value="fail" class="btn btn-danger">
+            ❌ شبیه‌سازی پرداخت ناموفق
+        </button>
+    </form>
+</div>
+{% endblock %}

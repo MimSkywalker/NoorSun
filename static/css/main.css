@@ -173,3 +173,27 @@
 .add-cart-form button:hover{
     background:#1d4ed8;
 }
+
+
+.fake-gateway-box {
+    max-width: 420px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+    border: 2px dashed #999;
+    border-radius: 8px;
+}
+.fake-gateway-warning {
+    background: #fff8e1;
+    color: #8a6d00;
+    padding: 0.6rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+.fake-gateway-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+.btn-success { background: #1e7e34; color: #fff; }
+.btn-danger { background: #c62828; color: #fff; }

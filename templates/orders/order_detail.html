@@ -45,4 +45,26 @@
 
   <a href="{% url 'orders:order_invoice' order.pk %}">مشاهده‌ی فاکتور</a> |
   <a href="{% url 'orders:order_invoice_pdf' order.pk %}">دانلود PDF فاکتور</a>
-{% endblock %}
+
+{% if order.status == 'pending_payment' %}
+    <div class="order-payment-actions">
+        <form method="get" action="{% url 'orders:payment_initiate' order.pk %}" style="display:inline;">
+            <button type="submit" class="btn btn-primary">پرداخت سفارش</button>
+        </form>
+        <form method="post" action="{% url 'orders:payment_cancel' order.pk %}" style="display:inline;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-secondary"
+                    onclick="return confirm('از پرداخت این سفارش انصراف می‌دهید؟ موجودی کالاها آزاد خواهد شد.');">
+                انصراف از پرداخت
+            </button>
+        </form>
+    </div>
+{% elif order.status == 'expired' %}
+    <p class="order-status-note">⏱ زمان پرداخت این سفارش به پایان رسیده و لغو شده است.</p>
+{% elif order.status == 'canceled' %}
+    <p class="order-status-note">🚫 این سفارش لغو شده است.</p>
+{% endif %}
+
+
+
+  {% endblock %}
