@@ -219,6 +219,16 @@ class ProductInactiveError(Exception):
         super().__init__(f"محصول {product} غیرفعال است.")
 
 
+class VariantInactiveError(Exception):
+    """
+    Raised when a product variant in the cart is no longer active.
+    """
+
+    def __init__(self, variant):
+        self.variant = variant
+        super().__init__(f"واریانت {variant} غیرفعال است.")
+
+
 @transaction.atomic
 def create_order_from_cart(cart, user, address):
     """
@@ -245,6 +255,9 @@ def create_order_from_cart(cart, user, address):
 
         if not variant.product.is_active:
             raise ProductInactiveError(variant.product)
+
+        if not variant.is_active:
+            raise VariantInactiveError(variant)
 
         if variant.stock < item.quantity:
             raise InsufficientStockError(variant, variant.stock)

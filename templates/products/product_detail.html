@@ -64,13 +64,17 @@
           style="
         {% if product.is_active %}
             
+            
           background: #dcfce7;
           color: #15803d;
 
+
           {% else %}
+            
             
           background: #fee2e2;
           color: #dc2626;
+
 
           {% endif %}
         padding: 6px 12px;
@@ -261,13 +265,17 @@
             ">موجودی: {{ v.stock }}</span>
             </li>
 
-            <form method="post" action="{% url 'orders:cart_add' v.id %}" class="add-cart-form">
-              {% csrf_token %}
+            {% if v.is_active %}
+              <form method="post" action="{% url 'orders:cart_add' v.id %}" class="add-cart-form">
+                {% csrf_token %}
 
-              <input type="number" name="quantity" value="1" min="1" max="{{ v.stock }}" />
+                <input type="number" name="quantity" value="1" min="1" max="{{ v.stock }}" />
 
-              <button type="submit">افزودن به سبد</button>
-            </form>
+                <button type="submit">افزودن به سبد</button>
+              </form>
+            {% else %}
+              <button type="button" disabled>غیرفعال</button>
+            {% endif %}
           {% endfor %}
         </ul>
       {% else %}

@@ -9,7 +9,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 
 
 from products.models import ProductVariant
-from .models import CartItem, Order, create_order_from_cart, InsufficientStockError, ProductInactiveError
+from .models import CartItem, Order, create_order_from_cart, InsufficientStockError, ProductInactiveError, VariantInactiveError
 from .utils import get_or_create_cart
 from addresses.models import Address
 
@@ -49,7 +49,7 @@ class CartAddView(View):
         # Get the selected product variant
         variant = get_object_or_404(ProductVariant, pk=variant_id)
 
-        if not variant.product.is_active:
+        if not variant.product.is_active or not variant.is_active:
             messages.error(request, "این محصول در حال حاضر ناموجود است.")
             if _is_ajax(request):
                 return JsonResponse({'error': True, 'message': 'محصول ناموجود است.'})
@@ -106,6 +106,13 @@ class CartUpdateItemView(View):
             item.delete()
             messages.success(request, "کالا از سبد حذف شد.")
         else:
+            is_unavailable = not item.variant.product.is_active or not item.variant.is_active
+            if is_unavailable and quantity > item.quantity:
+                messages.error(request, "این کالا دیگر قابل خرید نیست و نمی‌توانید تعدادش را افزایش دهید.")
+                if _is_ajax(request):
+                    return _cart_json(cart, error=True)
+                return redirect('orders:cart_detail')
+
             if quantity > item.variant.stock:
                 quantity = item.variant.stock
                 messages.warning(request, "تعداد به حداکثر موجودی محدود شد.")
@@ -177,6 +184,16 @@ class CheckoutView(LoginRequiredMixin, View):
             )
             cart.items.filter(
                 variant__product=e.product
+            ).delete()
+            return redirect('orders:cart_detail')
+
+        except VariantInactiveError as e:
+            messages.error(
+                request,
+                f"«{e.variant}» دیگر قابل خرید نیست و از سبد شما حذف خواهد شد."
+            )
+            cart.items.filter(
+                variant=e.variant
             ).delete()
             return redirect('orders:cart_detail')
 
