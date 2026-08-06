@@ -1,12 +1,15 @@
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Value
+import logging
 
 from .models import Cart, CartItem, Order, ProductVariant
 from products.models import Product
 from django.utils import timezone
 from datetime import timedelta
 from django.conf import settings
+from django.db.models.functions import Greatest
 
+logger = logging.getLogger(__name__)
 
 def get_or_create_cart(request):
     """
@@ -109,39 +112,75 @@ def merge_guest_cart_into_user(request, user, guest_session_key=None):
 
 def release_order_stock(order_id, new_status):
     """
-    Idempotently releases the stock reserved for an order, restores the
-    corresponding sales_count, and updates the order status.
+    Release the stock reserved for a pending order and update its status.
 
-    This function only operates when the order is still in PENDING_PAYMENT
-    status. If the order has already been processed, it returns False without
-    making any changes.
-
-    The row-level lock ensures that concurrent operations such as a successful
-    PaymentCallbackView, manual cancellation, automatic expiration via a
-    management command, or a lazy expiration check cannot process the same
-    order simultaneously. Only one operation can successfully release the
-    stock and change the status.
+    The operation is idempotent:
+    - Only orders that are still PENDING_PAYMENT are processed.
+    - select_for_update() prevents concurrent operations from processing
+      the same order at the same time.
+    - sales_count is clamped to zero to prevent database constraint errors.
     """
     with transaction.atomic():
         try:
+            # Lock the order row to prevent concurrent processes from handling
+            # the same pending order at the same time.
             order = Order.objects.select_for_update().get(pk=order_id)
         except Order.DoesNotExist:
             return False
 
-        if order.status != Order.Status.PENDING_PAYMENT:
+        # Only PENDING_PAYMENT orders can release their reserved stock.
+        # This also makes the operation idempotent.
+        if order.status != Order.Status.PENDING:
             return False
 
-        for item in order.items.select_related('variant', 'variant__product'):
+        # Load the order items together with their variant and product
+        # to avoid unnecessary database queries.
+        for item in order.items.select_related('variant', 'product'):
             if item.variant_id:
+                # Restore the quantity reserved by this order back to the variant stock.
                 ProductVariant.objects.filter(pk=item.variant_id).update(
                     stock=F('stock') + item.quantity
                 )
-                Product.objects.filter(pk=item.variant.product_id).update(
-                    sales_count=F('sales_count') - item.quantity
+
+            # Use the product snapshot stored on OrderItem instead of
+            # the live variant.product relationship.
+            product_id = item.product_id
+
+            # Old OrderItems may not have a product snapshot.
+            # In that case, log the issue and skip sales_count restoration.
+            if product_id is None:
+                logger.warning(
+                    "release_order_stock: آیتم #%s سفارش %s فاقد Snapshot "
+                    "محصول است؛ sales_count برای این آیتم بازگردانده نشد.",
+                    item.pk, order_id,
+                )
+                continue
+
+            # Decrease sales_count using the product snapshot.
+            # Greatest(..., 0) prevents the value from becoming negative.
+            Product.objects.filter(pk=product_id).update(
+                sales_count=Greatest(F('sales_count') - item.quantity, Value(0))
+            )
+
+            # Check whether sales_count was clamped to zero.
+            current = Product.objects.filter(
+                pk=product_id
+            ).values_list(
+                'sales_count', flat=True
+            ).first()
+
+            if current == 0:
+                logger.warning(
+                    "release_order_stock: sales_count محصول %s هنگام آزادسازی "
+                    "سفارش %s (تعداد آیتم=%s) به صفر چسبید؛ احتمال ناهم‌خوانی داده "
+                    "— بررسی شود.",
+                    product_id, order_id, item.quantity,
                 )
 
+        # Update the order status only after all stock operations succeed.
         order.status = new_status
         order.save(update_fields=['status', 'updated_at'])
+
         return True
 
 
@@ -152,7 +191,7 @@ def check_and_expire_order(order):
     Uses the idempotent stock-release function, making repeated calls safe.
     """
     # Only pending payments can expire.
-    if order.status != Order.Status.PENDING_PAYMENT:
+    if order.status != Order.Status.PENDING:
         return order
 
     # Check whether the payment window has expired.
@@ -164,3 +203,6 @@ def check_and_expire_order(order):
         order.refresh_from_db()
 
     return order
+
+
+

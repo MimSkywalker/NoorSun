@@ -9,6 +9,10 @@ from products.models import ProductVariant
 import random
 import string
 from datetime import date
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class Cart(TimeStampedModel):
@@ -125,7 +129,7 @@ class Order(TimeStampedModel):
         SHIPPED = 'shipped', 'ارسال شده'
         DELIVERED = 'delivered', 'تحویل داده شده'
         CANCELLED = 'cancelled', 'لغو شده'
-        EXPIRED = 'expired', 'منقضی شده' 
+        EXPIRED = 'expired', 'منقضی شده'
 
     # Order owner
     user = models.ForeignKey(
@@ -182,9 +186,13 @@ class OrderItem(models.Model):
 
     # Purchased variant
     variant = models.ForeignKey(
-        ProductVariant, on_delete=models.SET_NULL, null=True, related_name='order_items'
+        ProductVariant, on_delete=models.SET_NULL, null=True, blank=True, related_name='order_items'
     )
 
+    product = models.ForeignKey(
+        'products.Product', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='order_items',
+    )
     product_title = models.CharField(max_length=255)
     variant_info = models.CharField(max_length=255, blank=True)
     unit_price = models.DecimalField(max_digits=12, decimal_places=0)
@@ -289,6 +297,7 @@ def create_order_from_cart(cart, user, address):
         OrderItem.objects.create(
             order=order,
             variant=variant,
+            product=variant.product,
             product_title=variant.product.title,
             variant_info=str(variant),
             unit_price=item.unit_price,
@@ -301,7 +310,6 @@ def create_order_from_cart(cart, user, address):
     return order
 
 
-
 class Payment(TimeStampedModel):
     class Status(models.TextChoices):
         PENDING = 'pending', 'در انتظار'
@@ -312,7 +320,7 @@ class Payment(TimeStampedModel):
         Order, on_delete=models.PROTECT, related_name='payments'
     )
     gateway = models.CharField(max_length=30)
-    amount = models.DecimalField(max_digits=12, decimal_places=0) 
+    amount = models.DecimalField(max_digits=12, decimal_places=0)
     status = models.CharField(
         max_length=10, choices=Status.choices, default=Status.PENDING
     )
@@ -329,3 +337,5 @@ class Payment(TimeStampedModel):
 
     def __str__(self):
         return f'Payment #{self.pk} - {self.order.tracking_code} - {self.get_status_display()}'
+
+
