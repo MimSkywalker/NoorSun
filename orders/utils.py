@@ -1,7 +1,8 @@
-from .models import Cart, CartItem, Order, ProductVariant 
 from django.db import transaction
 from django.db.models import F
 
+from .models import Cart, CartItem, Order, ProductVariant
+from products.models import Product
 
 
 def get_or_create_cart(request):
@@ -103,7 +104,6 @@ def merge_guest_cart_into_user(request, user, guest_session_key=None):
     guest_cart.delete()
 
 
-
 def release_order_stock(order_id, new_status):
     """
     Idempotently releases the stock reserved for an order, restores the
@@ -126,7 +126,7 @@ def release_order_stock(order_id, new_status):
             return False
 
         if order.status != Order.Status.PENDING_PAYMENT:
-            return False  # The order has already been processed (successful, expired, or canceled).
+            return False
 
         for item in order.items.select_related('variant', 'variant__product'):
             if item.variant_id:
