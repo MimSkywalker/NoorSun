@@ -93,6 +93,7 @@ class ProductAdmin(admin.ModelAdmin):
         'title',
         'category',
         'brand',
+        'sales_count',
         'is_active',
         'total_stock',
         'created_at',
