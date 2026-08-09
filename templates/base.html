@@ -29,6 +29,8 @@
           <a href="{% url 'orders:cart_detail' %}" class="btn">سبد خرید</a>
           <a href="{% url 'orders:checkout' %}" class="btn">تسویه</a>
 
+          <a href="{% url 'orders:order_list' %}" class="btn">لیست سفارشات</a>
+
           <form method="post" action="{% url 'users:logout' %}" style="display:inline">
             {% csrf_token %}
             <button type="submit">خروج</button>
@@ -63,16 +65,26 @@
     <script>
       document.addEventListener('submit', function (e) {
         const form = e.target
-        const btn = form.querySelector('button[type="submit"]')
-        if (btn) {
-          if (btn.disabled) {
-            e.preventDefault()
-            return
-          }
-          btn.disabled = true
+        const submitter = e.submitter // دکمه‌ای که واقعاً submit رو trigger کرده
+      
+        if (submitter && submitter.disabled) {
+          e.preventDefault()
+          return
+        }
+      
+        if (submitter && submitter.name) {
+          const hidden = document.createElement('input')
+          hidden.type = 'hidden'
+          hidden.name = submitter.name
+          hidden.value = submitter.value
+          form.appendChild(hidden)
+        }
+      
+        if (submitter) {
+          submitter.disabled = true
           setTimeout(() => {
-            btn.disabled = false
-          }, 3000) // ایمنی در صورت خطای شبکه
+            submitter.disabled = false
+          }, 3000)
         }
       })
     </script>

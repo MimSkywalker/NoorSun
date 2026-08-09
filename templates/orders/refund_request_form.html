@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block title %}
+  درخواست بازگشت وجه
+{% endblock %}
+
+{% block content %}
+  <div class="refund-request-box">
+    <h2>درخواست بازگشت وجه</h2>
+
+    <p>
+      <strong>کد پیگیری سفارش:</strong> {{ order.tracking_code }}<br />
+      <strong>مبلغ سفارش:</strong> {{ order.total|floatformat:0 }} تومان
+    </p>
+
+    <p class="refund-request-note">لطفاً دلیل درخواست بازگشت وجه خود را بنویسید. درخواست شما پس از ثبت، توسط تیم پشتیبانی بررسی خواهد شد.</p>
+
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit" class="btn btn-primary">ثبت درخواست</button>
+    </form>
+  </div>
+{% endblock %}
