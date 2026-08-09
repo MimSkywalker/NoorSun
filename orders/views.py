@@ -512,6 +512,10 @@ class RefundRequestCreateView(LoginRequiredMixin, CreateView):
         #
         # Checking user=request.user also prevents IDOR attacks,
         # because a user cannot access another user's order by changing order_id.
+        
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        
         self.order = get_object_or_404(
             Order,
             pk=kwargs['order_id'],
