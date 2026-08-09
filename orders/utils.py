@@ -115,7 +115,7 @@ def release_order_stock(order_id, new_status):
     Release the stock reserved for a pending order and update its status.
 
     The operation is idempotent:
-    - Only orders that are still PENDING_PAYMENT are processed.
+    - Only orders that are still PENDING are processed.
     - select_for_update() prevents concurrent operations from processing
       the same order at the same time.
     - sales_count is clamped to zero to prevent database constraint errors.
@@ -128,7 +128,7 @@ def release_order_stock(order_id, new_status):
         except Order.DoesNotExist:
             return False
 
-        # Only PENDING_PAYMENT orders can release their reserved stock.
+        # Only PENDING orders can release their reserved stock.
         # This also makes the operation idempotent.
         if order.status != Order.Status.PENDING:
             return False

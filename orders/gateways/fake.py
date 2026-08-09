@@ -66,7 +66,7 @@ class FakePaymentGateway(PaymentGateway):
                 raw_response=callback_params,
             )
 
-        # Any result other than "success" is treated as a failed/canceled payment.
+        # Any result other than "success" is treated as a failed/CANCELLED payment.
         return GatewayVerifyResult(
             success=False,
             error_message="Payment was canceled by the user or failed (simulated).",

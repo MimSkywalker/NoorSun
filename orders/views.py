@@ -12,6 +12,8 @@ from django.views.generic import DetailView, ListView, TemplateView, CreateView
 from addresses.models import Address
 from products.models import ProductVariant
 
+from django.conf import settings
+
 from .gateways import get_gateway
 from .models import (
     CartItem,
@@ -23,6 +25,7 @@ from .models import (
     VariantInactiveError,
     create_order_from_cart,
 )
+
 
 from .utils import (
     check_and_expire_order,
@@ -318,11 +321,11 @@ class PaymentInitiateView(LoginRequiredMixin, View):
                 request,
                 "زمان پرداخت این سفارش به پایان رسیده و لغو شد.",
             )
-            return redirect("orders:detail", pk=order.pk)
+            return redirect("orders:order_detail", pk=order.pk)
 
-        if order.status != Order.Status.PENDING_PAYMENT:
+        if order.status != Order.Status.PENDING:
             messages.info(request, "این سفارش قبلاً پردازش شده است.")
-            return redirect("orders:detail", pk=order.pk)
+            return redirect("orders:order_detail", pk=order.pk)
 
         payment = Payment.objects.create(
             order=order,
@@ -344,7 +347,7 @@ class PaymentInitiateView(LoginRequiredMixin, View):
                 request,
                 "اتصال به درگاه پرداخت با خطا مواجه شد. دوباره تلاش کنید.",
             )
-            return redirect("orders:detail", pk=order.pk)
+            return redirect("orders:order_detail", pk=order.pk)
 
         # Store the gateway authority for the callback and verification step.
         payment.authority = result.authority or ""
@@ -375,12 +378,16 @@ class FakeGatewayView(LoginRequiredMixin, View):
         )
 
     def post(self, request, payment_id):
+        print("POST =", request.POST)
         payment = get_object_or_404(
             Payment,
             pk=payment_id,
             order__user=request.user,
             status=Payment.Status.PENDING,
         )
+
+        result = request.POST.get("result")
+        print("RESULT =", result)
 
         # Simulate the gateway result selected by the user.
         result = request.POST.get("result")
@@ -412,16 +419,18 @@ class PaymentCallbackView(View):
 
             order = Order.objects.select_for_update().get(pk=payment.order_id)
 
-            if order.status != Order.Status.PENDING_PAYMENT:
+            if order.status != Order.Status.PENDING:
                 # The order was finalized concurrently, so this payment is no longer valid.
                 payment.status = Payment.Status.FAILED
                 payment.raw_response = {"error": "order_no_longer_pending"}
                 payment.save(update_fields=["status", "raw_response"])
                 messages.error(request, "زمان این سفارش به پایان رسیده بود.")
-                return redirect("orders:detail", pk=order.pk)
+                return redirect("orders:order_detail", pk=order.pk)
 
             # Always verify through the gateway stored on the Payment.
             gateway = get_gateway(payment.gateway)
+            print(authority)
+
             verify_result = gateway.verify_payment(payment, request.GET.dict())
 
             if verify_result.success:
@@ -456,10 +465,10 @@ class PaymentCallbackView(View):
                     verify_result.error_message or "پرداخت ناموفق بود.",
                 )
 
-        return redirect("orders:detail", pk=payment.order_id)
+        return redirect("orders:order_detail", pk=payment.order_id)
 
     def _redirect_result(self, payment):
-        return redirect("orders:detail", pk=payment.order_id)
+        return redirect("orders:order_detail", pk=payment.order_id)
 
 
 class PaymentCancelView(LoginRequiredMixin, View):
@@ -470,8 +479,9 @@ class PaymentCancelView(LoginRequiredMixin, View):
     """
 
     def post(self, request, pk):
+
         order = get_object_or_404(Order, pk=pk, user=request.user)
-        released = release_order_stock(order.pk, Order.Status.CANCELED)
+        released = release_order_stock(order.pk, Order.Status.CANCELLED)
 
         if released:
             messages.success(request, "سفارش لغو شد و موجودی کالاها آزاد شد.")
@@ -481,7 +491,7 @@ class PaymentCancelView(LoginRequiredMixin, View):
                 "این سفارش دیگر قابل لغو نیست (احتمالاً پرداخت شده یا قبلاً لغو شده).",
             )
 
-        return redirect("orders:detail", pk=order.pk)
+        return redirect("orders:order_detail", pk=order.pk)
 
 
 class RefundRequestCreateView(LoginRequiredMixin, CreateView):
@@ -523,11 +533,17 @@ class RefundRequestCreateView(LoginRequiredMixin, CreateView):
         if not self.successful_payment:
             messages.error(
                 request, "برای این سفارش پرداخت موفقی ثبت نشده است.")
-            return redirect('orders:detail', pk=self.order.pk)
+            return redirect('orders:order_detail', pk=self.order.pk)
 
         # Continue with the normal CreateView processing
         # after all authorization and payment checks have passed.
         return super().dispatch(request, *args, **kwargs)
+
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['order'] = self.order
+        return context
 
     def form_valid(self, form):
         # Set the order server-side instead of accepting it from the user.
@@ -553,4 +569,4 @@ class RefundRequestCreateView(LoginRequiredMixin, CreateView):
     def get_success_url(self):
         # After successfully creating the refund request,
         # redirect the user back to the order detail page.
-        return reverse_lazy('orders:detail', kwargs={'pk': self.order.pk})
+        return reverse_lazy('orders:order_detail', kwargs={'pk': self.order.pk})
