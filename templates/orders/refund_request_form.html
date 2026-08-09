@@ -10,10 +10,14 @@
 
     <p>
       <strong>کد پیگیری سفارش:</strong> {{ order.tracking_code }}<br />
-      <strong>مبلغ سفارش:</strong> {{ order.total|floatformat:0 }} تومان
+      <strong>مبلغ اصلی سفارش:</strong> {{ order.total|floatformat:0 }} تومان
     </p>
 
-    <p class="refund-request-note">لطفاً دلیل درخواست بازگشت وجه خود را بنویسید. درخواست شما پس از ثبت، توسط تیم پشتیبانی بررسی خواهد شد.</p>
+    <div class="refund-penalty-warning">
+      ⚠️ با ثبت این درخواست، به دلیل جریمه‌ی {{ penalty_percent }}٪ لغو، مبلغ
+      <strong>{{ refund_amount_preview|floatformat:0 }} تومان</strong>
+      (به‌جای مبلغ کامل) برای بازگشت در نظر گرفته می‌شود. این درخواست پس از ثبت، نیاز به بررسی و تأیید تیم پشتیبانی دارد.
+    </div>
 
     <form method="post">
       {% csrf_token %}

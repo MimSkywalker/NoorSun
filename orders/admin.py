@@ -44,9 +44,13 @@ class PaymentAdmin(admin.ModelAdmin):
 
 @admin.register(RefundRequest)
 class RefundRequestAdmin(admin.ModelAdmin):
-    list_display = ('order', 'user', 'status', 'created_at', 'processed_at')
+    list_display = ('order', 'user', 'refund_amount',
+                    'status', 'created_at', 'processed_at')
     list_filter = ('status',)
     search_fields = ('order__tracking_code', 'user__phone_number')
-    readonly_fields = ('order', 'payment', 'user', 'reason', 'created_at')
-    fields = ('order', 'payment', 'user', 'reason', 'status',
-              'admin_note', 'processed_at', 'created_at')
+    readonly_fields = ('order', 'payment', 'user', 'reason',
+                       'refund_amount', 'created_at')
+    fields = (
+        'order', 'payment', 'user', 'reason', 'refund_amount',
+        'status', 'admin_note', 'processed_at', 'created_at',
+    )

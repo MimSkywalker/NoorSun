@@ -31,7 +31,11 @@ from .utils import (
     check_and_expire_order,
     get_or_create_cart,
     release_order_stock,
+    timezone,
 )
+
+from datetime import timedelta
+from decimal import Decimal
 
 
 def _is_ajax(request):
@@ -495,82 +499,101 @@ class PaymentCancelView(LoginRequiredMixin, View):
 
 
 class RefundRequestCreateView(LoginRequiredMixin, CreateView):
-    # Create a refund request using the RefundRequest model.
+    # Model used to create the refund request
     model = RefundRequest
-
-    # The user is only allowed to submit the refund reason.
-    # Sensitive fields such as order, payment, and user are set server-side.
     fields = ['reason']
-
-    # Template used to display the refund request form.
     template_name = 'orders/refund_request_form.html'
 
     def dispatch(self, request, *args, **kwargs):
-        # Retrieve the requested order while ensuring that:
-        # 1. The order belongs to the currently authenticated user.
-        # 2. The order is in a status that allows a refund request.
-        #
-        # Checking user=request.user also prevents IDOR attacks,
-        # because a user cannot access another user's order by changing order_id.
-        
+
+
+
+
+        # Get the user's processing order
         if not request.user.is_authenticated:
             return self.handle_no_permission()
-        
+
         self.order = get_object_or_404(
             Order,
             pk=kwargs['order_id'],
             user=request.user,
-            status__in=[Order.Status.PROCESSING,
-                        Order.Status.SHIPPED, Order.Status.DELIVERED],
+            status=Order.Status.PROCESSING,
         )
 
-        # Only orders with at least one successful payment
-        # are eligible for a refund request.
-        #
-        # If multiple successful payments exist, use the most recent
-        # successful payment based on paid_at.
+
+        # Prevent duplicate refund requests
+        existing_refund_request = RefundRequest.objects.filter(
+                order=self.order
+            ).first()
+
+        if existing_refund_request:
+            messages.info(
+                request,
+                "درخواست بازگشت وجه شما قبلاً ثبت شده است."
+            )
+            return redirect(
+                'orders:order_detail',
+                pk=self.order.pk
+            )
+
+        # Get the latest successful payment
         self.successful_payment = self.order.payments.filter(
             status=Payment.Status.SUCCESS
         ).order_by('-paid_at').first()
 
-        # Do not allow a refund request if no successful payment exists.
-        if not self.successful_payment:
+        # Refund is only available if a successful payment exists
+        if not self.successful_payment or not self.successful_payment.paid_at:
             messages.error(
                 request, "برای این سفارش پرداخت موفقی ثبت نشده است.")
             return redirect('orders:order_detail', pk=self.order.pk)
 
-        # Continue with the normal CreateView processing
-        # after all authorization and payment checks have passed.
+        # Check whether the refund window has expired
+        refund_deadline = self.successful_payment.paid_at + timedelta(
+            minutes=settings.REFUND_WINDOW_MINUTES
+        )
+        if timezone.now() >= refund_deadline:
+            remaining_minutes = int(
+                (refund_deadline - timezone.now()).total_seconds() // 60) + 1
+            messages.error(
+                request,
+                f"مهلت {settings.REFUND_WINDOW_MINUTES} دقیقه‌ای برای درخواست "
+                f"بازگشت وجه این سفارش به پایان رسیده است."
+            )
+            return redirect('orders:order_detail', pk=self.order.pk)
+
         return super().dispatch(request, *args, **kwargs)
 
-
     def get_context_data(self, **kwargs):
+        # Add refund information to the template context
         context = super().get_context_data(**kwargs)
         context['order'] = self.order
+        context['penalty_percent'] = settings.REFUND_PENALTY_PERCENT
+        context['refund_amount_preview'] = self._calculate_refund_amount()
         return context
 
+    def _calculate_refund_amount(self):
+        # Calculate the refund amount after applying the penalty
+        penalty_percent = Decimal(settings.REFUND_PENALTY_PERCENT)
+        return (self.order.total * (Decimal('100') - penalty_percent) / Decimal('100')).quantize(Decimal('1'))
+
     def form_valid(self, form):
-        # Set the order server-side instead of accepting it from the user.
-        # This prevents the user from attaching the refund request
-        # to a different order.
+        # Set the required data before saving the refund request
+        refund_amount = self._calculate_refund_amount()
         form.instance.order = self.order
 
-        # Associate the refund request with the verified successful payment.
-        # This value is also controlled by the server.
         form.instance.payment = self.successful_payment
 
-        # Associate the refund request with the currently authenticated user.
-        # The user cannot choose or modify this value through the form.
         form.instance.user = self.request.user
+        form.instance.refund_amount = refund_amount
 
-        # Inform the user that the refund request was successfully created.
         messages.success(
-            self.request, "درخواست بازگشت وجه شما ثبت شد و در حال بررسی است.")
-
-        # Save the RefundRequest and continue the normal CreateView flow.
+            self.request,
+            f"درخواست بازگشت وجه شما ثبت شد. مبلغ قابل بازگشت (با کسر "
+            f"{settings.REFUND_PENALTY_PERCENT}٪ جریمه‌ی لغو): {refund_amount:,.0f} تومان. "
+            f"این درخواست در انتظار بررسی ادمین است."
+        )
         return super().form_valid(form)
 
     def get_success_url(self):
-        # After successfully creating the refund request,
-        # redirect the user back to the order detail page.
+        # Redirect to the order details after successful submission
         return reverse_lazy('orders:order_detail', kwargs={'pk': self.order.pk})

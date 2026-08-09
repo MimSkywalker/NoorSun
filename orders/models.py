@@ -358,6 +358,11 @@ class RefundRequest(TimeStampedModel):
         related_name='refund_requests'
     )
     reason = models.TextField()
+
+    refund_amount = models.DecimalField(
+        max_digits=12, decimal_places=0, null=True, blank=True
+    )
+    
     status = models.CharField(
         max_length=10, choices=Status.choices, default=Status.PENDING
     )
