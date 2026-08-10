@@ -3,6 +3,7 @@ import random
 import secrets
 import string
 from datetime import date
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -15,7 +16,14 @@ from products.models import ProductVariant
 
 logger = logging.getLogger(__name__)
 
+class DiscountCodeInvalidError(Exception):
+    def __init__(self, code, message):
+        self.code = code
+        self.message = message
+        super().__init__(message)
 
+
+        
 class Cart(TimeStampedModel):
 
     # Authenticated user (optional for guests)
@@ -31,6 +39,11 @@ class Cart(TimeStampedModel):
     session_key = models.CharField(
         max_length=40, null=True, blank=True, db_index=True)
     is_active = models.BooleanField(default=True)
+
+    discount_code = models.ForeignKey(
+        'DiscountCode', on_delete=models.SET_NULL, null=True, blank=True, related_name='active_in_carts'
+    )
+
 
     class Meta:
         # Optimize cart lookups
@@ -76,8 +89,13 @@ class Cart(TimeStampedModel):
         return settings.CART_PACKAGING_COST
 
     @property
+    def discount_amount(self):
+        from .discounts import calculate_cart_discount
+        return calculate_cart_discount(self)
+
+    @property
     def total(self):
-        return self.subtotal + self.shipping_cost + self.packaging_cost
+        return self.subtotal + self.shipping_cost + self.packaging_cost - self.discount_amount
 
 
 class CartItem(TimeStampedModel):
@@ -157,6 +175,10 @@ class Order(TimeStampedModel):
     shipping_cost = models.DecimalField(max_digits=12, decimal_places=0)
     packaging_cost = models.DecimalField(max_digits=12, decimal_places=0)
     total = models.DecimalField(max_digits=12, decimal_places=0)
+
+    discount_code_str = models.CharField(max_length=30, blank=True) 
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=0, default=0)
+
 
     class Meta:
         indexes = [
@@ -272,6 +294,23 @@ def create_order_from_cart(cart, user, address):
         if variant.stock < item.quantity:
             raise InsufficientStockError(variant, variant.stock)
 
+
+    discount_code = cart.discount_code
+    discount_amount = Decimal('0')
+    code_str = ''
+
+
+
+    if discount_code:
+        # Final validation of the discount code immediately before creating the order.
+        ok, error = discount_code.validate_for_cart(cart, user)
+        if not ok:
+            raise DiscountCodeInvalidError(discount_code, error)
+
+        discount_amount = discount_code.calculate_discount_amount(cart)
+
+        code_str = discount_code.code
+
     order = Order.objects.create(
         user=user,
         address_title=address.title,
@@ -284,7 +323,9 @@ def create_order_from_cart(cart, user, address):
         subtotal=cart.subtotal,
         shipping_cost=cart.shipping_cost,
         packaging_cost=cart.packaging_cost,
-        total=cart.total,
+        discount_code_str=code_str,
+        discount_amount=discount_amount,
+        total=cart.subtotal + cart.shipping_cost + cart.packaging_cost - discount_amount,
     )
 
     for item in items:
@@ -305,8 +346,15 @@ def create_order_from_cart(cart, user, address):
             quantity=item.quantity,
         )
 
+    if discount_code:
+        DiscountCodeUsage.objects.create(code=discount_code,
+                                          user=user, order=order,
+                                            discount_amount=discount_amount,
+                                        )
+
     cart.is_active = False
-    cart.save(update_fields=['is_active'])
+    cart.discount_code = None
+    cart.save(update_fields=['is_active', 'discount_code'])
 
     return order
 
