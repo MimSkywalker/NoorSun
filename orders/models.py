@@ -1,16 +1,17 @@
+import logging
+import random
+import secrets
+import string
+from datetime import date
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
+from django.utils import timezone
 
 from core.models import TimeStampedModel
 from products.models import ProductVariant
-
-
-import random
-import string
-from datetime import date
-import logging
-
 
 logger = logging.getLogger(__name__)
 
@@ -371,3 +372,172 @@ class RefundRequest(TimeStampedModel):
 
     def __str__(self):
         return f'RefundRequest #{self.pk} - {self.order.tracking_code}'
+
+
+
+
+
+
+
+class DiscountCode(TimeStampedModel):
+    class DiscountType(models.TextChoices):
+        PERCENTAGE = 'percentage', 'درصدی'
+        FIXED = 'fixed', 'مبلغ ثابت'
+
+    code = models.CharField(max_length=30, unique=True, db_index=True)
+    discount_type = models.CharField(max_length=10, choices=DiscountType.choices)
+
+    # Percentage: 1–100. Fixed: amount in toman.
+    value = models.DecimalField(max_digits=12, decimal_places=0)
+
+    min_order_amount = models.DecimalField(
+        max_digits=12, decimal_places=0, null=True, blank=True,
+        help_text="حداقل مبلغ سبد برای اعمال این کد؛ خالی یعنی بدون محدودیت."
+    )
+
+    # Optional scope restrictions. Empty means the entire cart is eligible.
+    categories = models.ManyToManyField('products.Category', blank=True, related_name='discount_codes')
+    brands = models.ManyToManyField('products.Brand', blank=True, related_name='discount_codes')
+    products = models.ManyToManyField('products.Product', blank=True, related_name='discount_codes')
+
+    max_uses = models.PositiveIntegerField(
+        null=True, blank=True, help_text="سقف کلی استفاده در کل سایت؛ خالی یعنی نامحدود."
+    )
+    max_uses_per_user = models.PositiveIntegerField(
+        null=True, blank=True, help_text="سقف استفاده برای هر کاربر؛ خالی یعنی نامحدود."
+    )
+
+    valid_from = models.DateTimeField(default=timezone.now)
+    valid_until = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['code', 'is_active']),
+        ]
+
+    def __str__(self):
+        return self.code
+
+    def save(self, *args, **kwargs):
+        if self.code:
+            self.code = self.code.strip().upper()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def generate_unique_code(cls, length=8):
+        """Generate a unique random code."""
+        alphabet = string.ascii_uppercase + string.digits
+        while True:
+            candidate = ''.join(secrets.choice(alphabet) for _ in range(length))
+            if not cls.objects.filter(code=candidate).exists():
+                return candidate
+
+    @property
+    def is_expired(self):
+        if not self.valid_until:
+            return False
+        return timezone.now() > self.valid_until
+
+    @property
+    def is_not_started(self):
+        return timezone.now() < self.valid_from
+
+    @property
+    def total_uses(self):
+        return self.usages.filter(order__isnull=False).count()
+
+    def uses_by_user(self, user):
+        if not user or not user.is_authenticated:
+            return 0
+        return self.usages.filter(user=user, order__isnull=False).count()
+
+    def has_scope_restriction(self):
+        return self.categories.exists() or self.brands.exists() or self.products.exists()
+
+    def applies_to_variant(self, variant):
+        """Check whether this code applies to the given variant."""
+        if not self.has_scope_restriction():
+            return True
+        product = variant.product
+        if self.products.filter(pk=product.pk).exists():
+            return True
+        if product.category_id and self.categories.filter(pk=product.category_id).exists():
+            return True
+        if product.brand_id and self.brands.filter(pk=product.brand_id).exists():
+            return True
+        return False
+
+    def validate_for_cart(self, cart, user):
+        """
+        Validate the discount code for a specific cart and user.
+        Returns (True, None) or (False, 'error message').
+        """
+        if not self.is_active:
+            return False, "این کد تخفیف غیرفعال است."
+        if self.is_not_started:
+            return False, "این کد تخفیف هنوز فعال نشده است."
+        if self.is_expired:
+            return False, "این کد تخفیف منقضی شده است."
+
+        if self.max_uses is not None and self.total_uses >= self.max_uses:
+            return False, "ظرفیت استفاده از این کد تخفیف تکمیل شده است."
+
+        if self.max_uses_per_user is not None and self.uses_by_user(user) >= self.max_uses_per_user:
+            return False, "شما قبلاً از سقف مجاز استفاده از این کد استفاده کرده‌اید."
+
+        applicable_subtotal = self.get_applicable_subtotal(cart)
+        if applicable_subtotal <= 0:
+            return False, "این کد تخفیف روی هیچ‌کدام از کالاهای سبد شما قابل اعمال نیست."
+
+        if self.min_order_amount is not None and applicable_subtotal < self.min_order_amount:
+            return False, (
+                f"حداقل مبلغ سفارش برای استفاده از این کد "
+                f"{self.min_order_amount:,.0f} تومان است."
+            )
+
+        return True, None
+
+    def get_applicable_subtotal(self, cart):
+        """Calculate the subtotal of eligible cart items."""
+        total = 0
+        for item in cart.items.select_related('variant', 'variant__product'):
+            if self.applies_to_variant(item.variant):
+                total += item.unit_price * item.quantity
+        return total
+
+    def calculate_discount_amount(self, cart):
+        """Calculate the discount for eligible items only."""
+        applicable_subtotal = self.get_applicable_subtotal(cart)
+        if applicable_subtotal <= 0:
+            return 0
+
+        if self.discount_type == self.DiscountType.PERCENTAGE:
+            amount = applicable_subtotal * self.value / 100
+        else:
+            amount = self.value
+
+        # The discount cannot exceed the eligible subtotal.
+        return min(amount, applicable_subtotal)
+
+
+
+class DiscountCodeUsage(TimeStampedModel):
+    """
+    Track each discount code usage for usage limits and historical snapshots.
+    An order=None record means the code is reserved but the order is not finalized.
+    """
+    code = models.ForeignKey(DiscountCode, on_delete=models.PROTECT, related_name='usages')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='discount_usages')
+    order = models.ForeignKey(
+        'orders.Order', on_delete=models.SET_NULL, null=True, blank=True, related_name='discount_usages'
+    )
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=0)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['code', 'user']),
+        ]
+
+    def __str__(self):
+        return f'{self.code.code} - {self.user.phone_number}'
