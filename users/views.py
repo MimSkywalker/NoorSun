@@ -6,12 +6,12 @@ from .forms import PhoneNumberForm, OTPVerifyForm, PhoneLoginForm, RegisterWithP
 from .models import User, OTPRequest
 from .services import sms_service
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, REDIRECT_FIELD_NAME
 from django.contrib.auth.tokens import default_token_generator
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.encoding import force_str
-from django.utils.http import urlsafe_base64_decode
+from django.utils.http import urlsafe_base64_decode, url_has_allowed_host_and_scheme
 from django.views import View
 
 from .forms import PhoneNumberForm, OTPVerifyForm, SetNewPasswordForm, EmailPasswordResetForm
@@ -21,6 +21,18 @@ from .services import sms_service
 from orders.utils import merge_guest_cart_into_user
 
 User = get_user_model()
+SESSION_LOGIN_NEXT_KEY = 'login_next_url'
+
+
+def _get_safe_next_url(request, candidate):
+
+    if candidate and url_has_allowed_host_and_scheme(
+        url=candidate,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return candidate
+    return None
 
 
 class RequestOTPView(View):
@@ -35,30 +47,77 @@ class RequestOTPView(View):
 
     def get(self, request):
         if request.user.is_authenticated:
-            return redirect(reverse('profiles:detail'))
-        return render(request, self.template_name, {'form': PhoneNumberForm()})
+            return redirect('profiles:detail')
+
+        next_url = _get_safe_next_url(
+            request,
+            request.GET.get(REDIRECT_FIELD_NAME)
+        )
+
+        if next_url:
+            request.session[SESSION_LOGIN_NEXT_KEY] = next_url
+
+        return render(
+            request,
+            self.template_name,
+            {
+                'form': PhoneNumberForm(),
+                'next': next_url or '',
+            }
+        )
 
     def post(self, request):
         if request.user.is_authenticated:
-            return redirect(reverse('profiles:detail'))
+            return redirect('profiles:detail')
+
+        next_url = _get_safe_next_url(
+            request,
+            request.POST.get(REDIRECT_FIELD_NAME)
+        )
+
+        if next_url:
+            request.session[SESSION_LOGIN_NEXT_KEY] = next_url
 
         form = PhoneNumberForm(request.POST)
+
         if not form.is_valid():
-            return render(request, self.template_name, {'form': form})
+            return render(
+                request,
+                self.template_name,
+                {
+                    'form': form,
+                    'next': next_url or '',
+                }
+            )
 
         phone_number = form.cleaned_data['phone_number']
 
         try:
             otp = OTPRequest.generate(
-                phone_number, purpose=OTPRequest.Purpose.REGISTER_LOGIN)
+                phone_number,
+                purpose=OTPRequest.Purpose.REGISTER_LOGIN,
+            )
         except ValueError as e:
             messages.error(request, str(e))
-            return render(request, self.template_name, {'form': form})
+            return render(
+                request,
+                self.template_name,
+                {
+                    'form': form,
+                    'next': next_url or '',
+                }
+            )
 
         sms_service.send_otp(phone_number, otp.code)
+
         request.session[SESSION_PHONE_KEY] = phone_number
-        messages.success(request, "کد تأیید ارسال شد.")
-        return redirect(reverse('users:verify_otp'))
+
+        messages.success(
+            request,
+            "کد تأیید ارسال شد."
+        )
+
+        return redirect('users:verify_otp')
 
 
 class VerifyOTPView(View):
@@ -135,6 +194,13 @@ class VerifyOTPView(View):
             messages.success(request, "ثبت‌نام با موفقیت انجام شد.")
         else:
             messages.success(request, "با موفقیت وارد شدید.")
+        next_url = request.session.pop(
+            SESSION_LOGIN_NEXT_KEY,
+            None,
+        )
+
+        if next_url:
+            return redirect(next_url)
 
         return redirect(reverse('profiles:detail'))
 
@@ -400,15 +466,39 @@ class RegisterWithPasswordView(View):
 
 
 class PhoneLoginView(View):
+
     template_name = 'users/login_password.html'
 
     def get(self, request):
-        return render(request, self.template_name, {'form': PhoneLoginForm()})
+        if request.user.is_authenticated:
+            return redirect('profiles:detail')
+
+        next_url = _get_safe_next_url(
+            request,
+            request.GET.get(REDIRECT_FIELD_NAME)
+        )
+
+        if next_url:
+            request.session[SESSION_LOGIN_NEXT_KEY] = next_url
+
+        return render(request, self.template_name, {'form': PhoneLoginForm(), 'next': next_url or '', })
 
     def post(self, request):
+
+        if request.user.is_authenticated:
+            return redirect('profiles:detail')
+
+        next_url = _get_safe_next_url(
+            request,
+            request.POST.get(REDIRECT_FIELD_NAME)
+        )
+
+        if next_url:
+            request.session[SESSION_LOGIN_NEXT_KEY] = next_url
+
         form = PhoneLoginForm(request.POST)
         if not form.is_valid():
-            return render(request, self.template_name, {'form': form})
+            return render(request, self.template_name, {'form': form, 'next': next_url or '', })
 
         user = authenticate(
             request,
@@ -417,11 +507,18 @@ class PhoneLoginView(View):
         )
         if user is None:
             messages.error(request, "شماره موبایل یا رمز عبور اشتباه است.")
-            return render(request, self.template_name, {'form': form})
+            return render(request, self.template_name, {'form': form, 'next': next_url or ''})
 
         guest_session_key = request.session.session_key
         login(request, user)
         merge_guest_cart_into_user(
             request, user, guest_session_key=guest_session_key)
         messages.success(request, "با موفقیت وارد شدید.")
+        next_url = request.session.pop(
+            SESSION_LOGIN_NEXT_KEY,
+            None,
+        )
+
+        if next_url:
+            return redirect(next_url)
         return redirect(reverse('profiles:detail'))
