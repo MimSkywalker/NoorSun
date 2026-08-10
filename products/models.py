@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.text import slugify
-
+from django.utils import timezone
 from core.models import TimeStampedModel
 
 from .utils import product_image_upload_path, process_product_image
@@ -249,6 +249,11 @@ class ProductVariant(TimeStampedModel):
         max_digits=10, decimal_places=0, null=True, blank=True
     )
 
+    promo_price = models.DecimalField(
+        max_digits=12, decimal_places=0, null=True, blank=True)
+    promo_start = models.DateTimeField(null=True, blank=True)
+    promo_end = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         verbose_name = "تنوع محصول"
         verbose_name_plural = "تنوع‌های محصول"
@@ -262,14 +267,122 @@ class ProductVariant(TimeStampedModel):
         attrs = ", ".join(str(v) for v in self.attribute_values.all())
         return f"{self.product.title} ({attrs or 'بدون ویژگی'})"
 
+    def clean(self):
+
+        if self.promo_price is not None and (not self.promo_start or not self.promo_end):
+            raise ValidationError(
+                "برای تخفیف زمان‌دار، تاریخ شروع و پایان الزامی است.")
+
+        if self.promo_start and self.promo_end and self.promo_start >= self.promo_end:
+            raise ValidationError(
+                "تاریخ شروع تخفیف زمان‌دار باید قبل از تاریخ پایان باشد.")
+
+    @property
+    def is_promo_active(self):
+        if self.promo_price is None or not self.promo_start or not self.promo_end:
+            return False
+        now = timezone.now()
+        return self.promo_start <= now <= self.promo_end
+
+    def active_campaign_price(self):
+        best_price = None
+        for campaign in Campaign.objects.filter(is_active=True).prefetch_related(
+            'categories', 'brands', 'products'
+        ):
+            if campaign.is_running and campaign.covers_variant(self):
+                price = campaign.price_for(self)
+                if best_price is None or price < best_price:
+                    best_price = price
+        return best_price
+
     @property
     def is_in_stock(self):
         return self.stock > 0 and self.is_active
 
     @property
     def final_price(self):
-        return self.discount_price if self.discount_price else self.price
+        candidates = [self.price]
+
+        if self.discount_price is not None:
+            candidates.append(self.discount_price)
+
+        if self.is_promo_active:
+            candidates.append(self.promo_price)
+
+        campaign_price = self.active_campaign_price()
+        if campaign_price is not None:
+            candidates.append(campaign_price)
+
+        return min(candidates)
 
     @property
     def has_discount(self):
-        return bool(self.discount_price and self.discount_price < self.price)
+        return self.final_price < self.price
+
+
+class Campaign(TimeStampedModel):
+    class DiscountType(models.TextChoices):
+        PERCENTAGE = 'percentage', 'درصدی'
+        FIXED = 'fixed', 'مبلغ ثابت'
+
+    title = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=220, unique=True, blank=True)
+
+    discount_type = models.CharField(
+        max_length=10, choices=DiscountType.choices)
+    value = models.DecimalField(max_digits=12, decimal_places=0)
+
+    # Optional scope restrictions for the campaign.
+    categories = models.ManyToManyField(
+        'Category', blank=True, related_name='campaigns')
+    brands = models.ManyToManyField(
+        'Brand', blank=True, related_name='campaigns')
+    products = models.ManyToManyField(
+        'Product', blank=True, related_name='campaigns')
+
+    start_at = models.DateTimeField()
+    end_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['start_at', 'end_at', 'is_active']),
+        ]
+
+    def __str__(self):
+        return self.title
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.title, allow_unicode=True)
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        if self.start_at and self.end_at and self.start_at >= self.end_at:
+            raise ValidationError(
+                "تاریخ شروع کمپین باید قبل از تاریخ پایان باشد.")
+
+    @property
+    def is_running(self):
+        if not self.is_active:
+            return False
+        now = timezone.now()
+        return self.start_at <= now <= self.end_at
+
+    def covers_variant(self, variant):
+        """Check whether this campaign applies to the given variant."""
+        product = variant.product
+        if self.products.filter(pk=product.pk).exists():
+            return True
+        if product.category_id and self.categories.filter(pk=product.category_id).exists():
+            return True
+        if product.brand_id and self.brands.filter(pk=product.brand_id).exists():
+            return True
+        return False
+
+    def price_for(self, variant):
+        """Calculate the variant price after applying this campaign."""
+        base = variant.price
+        if self.discount_type == self.DiscountType.PERCENTAGE:
+            return base - (base * self.value / 100)
+        return max(base - self.value, 0)
