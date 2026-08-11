@@ -284,15 +284,30 @@ class ProductVariant(TimeStampedModel):
         now = timezone.now()
         return self.promo_start <= now <= self.promo_end
 
+    _campaign_price_cache = None
+
     def active_campaign_price(self):
+        if self._campaign_price_cache is not None or hasattr(
+            self, '_campaign_price_cache_set'
+        ):
+            return self._campaign_price_cache
+
+        # Fallback for contexts where campaign prices were not precomputed.
         best_price = None
-        for campaign in Campaign.objects.filter(is_active=True).prefetch_related(
-            'categories', 'brands', 'products'
+
+        for campaign in Campaign.objects.filter(
+            is_active=True
+        ).prefetch_related(
+            'categories',
+            'brands',
+            'products',
         ):
             if campaign.is_running and campaign.covers_variant(self):
                 price = campaign.price_for(self)
+
                 if best_price is None or price < best_price:
                     best_price = price
+
         return best_price
 
     @property
@@ -371,13 +386,20 @@ class Campaign(TimeStampedModel):
 
     def covers_variant(self, variant):
         """Check whether this campaign applies to the given variant."""
-        product = variant.product
-        if self.products.filter(pk=product.pk).exists():
+        product = variant.product  # باید از قبل با select_related لود شده باشد
+
+        product_ids = {p.pk for p in self.products.all()}
+        if product.pk in product_ids:
             return True
-        if product.category_id and self.categories.filter(pk=product.category_id).exists():
+
+        category_ids = {c.pk for c in self.categories.all()}
+        if product.category_id and product.category_id in category_ids:
             return True
-        if product.brand_id and self.brands.filter(pk=product.brand_id).exists():
+
+        brand_ids = {b.pk for b in self.brands.all()}
+        if product.brand_id and product.brand_id in brand_ids:
             return True
+
         return False
 
     def price_for(self, variant):

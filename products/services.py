@@ -1,4 +1,8 @@
 from .models import Product
+from django.utils import timezone
+from .models import Campaign
+from django.db.models import Prefetch
+from products.models import ProductVariant
 
 # Default number of products displayed in special sections.
 SPECIAL_SECTION_LIMIT = 8
@@ -67,3 +71,33 @@ def get_similar_products(product, limit=SPECIAL_SECTION_LIMIT):
         same_category += same_brand
 
     return same_category
+
+
+def attach_campaign_prices(products):
+    """
+    Precompute campaign prices once to avoid N+1 queries per variant.
+    """
+
+    now = timezone.now()
+    active_campaigns = list(
+        Campaign.objects.filter(
+            is_active=True, start_at__lte=now, end_at__gte=now)
+        .prefetch_related('categories', 'brands', 'products')
+    )
+
+    if not active_campaigns:
+        return list(products)
+
+    products = list(products)
+    for product in products:
+        for variant in product.variants.all():
+            variant.product = product
+            best_price = None
+            for campaign in active_campaigns:
+                if campaign.covers_variant(variant):
+                    price = campaign.price_for(variant)
+                    if best_price is None or price < best_price:
+                        best_price = price
+            variant._campaign_price_cache = best_price
+
+    return products

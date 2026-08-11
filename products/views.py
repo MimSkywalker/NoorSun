@@ -29,6 +29,7 @@ from .services import (
     get_discounted_products,
     get_new_products,
     get_similar_products,
+    attach_campaign_prices,
 )
 
 
@@ -54,6 +55,7 @@ class ProductListView(ListView):
 
         context['categories'] = Category.objects.all()
         context['brands'] = Brand.objects.all()
+        context['products'] = attach_campaign_prices(context['products'])
 
         # Load all available product attributes dynamically.
         attributes = Attribute.objects.prefetch_related('values')
@@ -99,7 +101,8 @@ class ProductDetailView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['similar_products'] = get_similar_products(self.object)
+        context['similar_products'] = attach_campaign_prices(
+            get_similar_products(self.object))
         context['is_unavailable'] = not self.object.is_active
         return context
 
@@ -175,9 +178,11 @@ class HomeView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['new_products'] = get_new_products()
-        context['bestselling_products'] = get_bestselling_products()
-        context['discounted_products'] = get_discounted_products()
+        context['new_products'] = attach_campaign_prices(get_new_products())
+        context['bestselling_products'] = attach_campaign_prices(
+            get_bestselling_products())
+        context['discounted_products'] = attach_campaign_prices(
+            get_discounted_products())
 
         now = timezone.now()
         context['active_campaigns'] = Campaign.objects.filter(
