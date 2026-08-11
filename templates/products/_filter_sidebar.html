@@ -1,46 +1,105 @@
 {% load product_extras %}
-<form id="filter-form">
-    <input type="text" name="q" placeholder="جستجوی محصول..." value="{{ current_params.q }}">
 
+<form id="filter-form">
+
+    {% if request.GET.campaign %}
+        <input type="hidden" name="campaign" value="{{ request.GET.campaign }}">
+    {% endif %}
+
+    <input
+        type="text"
+        name="q"
+        placeholder="جستجوی محصول..."
+        value="{{ current_params.q }}"
+    >
     <select name="category">
         <option value="">همه‌ی دسته‌ها</option>
+
         {% for c in categories %}
-            <option value="{{ c.slug }}" {% if current_params.category == c.slug %}selected{% endif %}>{{ c.name }}</option>
+            <option
+                value="{{ c.slug }}"
+                {% if current_params.category == c.slug %}selected{% endif %}
+            >
+                {{ c.name }}
+            </option>
         {% endfor %}
     </select>
 
     <select name="brand">
         <option value="">همه‌ی برندها</option>
+
         {% for b in brands %}
-            <option value="{{ b.slug }}" {% if current_params.brand == b.slug %}selected{% endif %}>{{ b.name }}</option>
+            <option
+                value="{{ b.slug }}"
+                {% if current_params.brand == b.slug %}selected{% endif %}
+            >
+                {{ b.name }}
+            </option>
         {% endfor %}
     </select>
 
-{% for attribute in attributes %}
-    <fieldset class="attr-filter">
-        <legend>{{ attribute.name }}</legend>
-        {% for value in attribute.values.all %}
-            <label>
-                <input
-                    type="checkbox"
-                    name="attr_{{ attribute.id }}"
-                    value="{{ value.id }}"
-                    {% if value.id|stringformat:"s" in current_params|getlist_key:attribute.id %}checked{% endif %}
-                >
-                {{ value.value }}
-            </label>
-        {% endfor %}
-    </fieldset>
-{% endfor %}
+    {% for attribute in attributes %}
+        <fieldset class="attr-filter">
+            <legend>{{ attribute.name }}</legend>
 
+            {% for value in attribute.values.all %}
+                <label>
+                    <input
+                        type="checkbox"
+                        name="attr_{{ attribute.id }}"
+                        value="{{ value.id }}"
+                        {% if value.id|stringformat:"s" in current_params|getlist_key:attribute.id %}
+                            checked
+                        {% endif %}
+                    >
+                    {{ value.value }}
+                </label>
+            {% endfor %}
+        </fieldset>
+    {% endfor %}
 
-    <input type="number" name="min_price" placeholder="حداقل قیمت" value="{{ current_params.min_price }}">
-    <input type="number" name="max_price" placeholder="حداکثر قیمت" value="{{ current_params.max_price }}">
+    <input
+        type="number"
+        name="min_price"
+        placeholder="حداقل قیمت"
+        value="{{ current_params.min_price }}"
+    >
+
+    <input
+        type="number"
+        name="max_price"
+        placeholder="حداکثر قیمت"
+        value="{{ current_params.max_price }}"
+    >
 
     <select name="sort">
-        <option value="newest" {% if current_params.sort == "newest" or not current_params.sort %}selected{% endif %}>جدیدترین</option>
-        <option value="cheapest" {% if current_params.sort == "cheapest" %}selected{% endif %}>ارزان‌ترین</option>
-        <option value="expensive" {% if current_params.sort == "expensive" %}selected{% endif %}>گران‌ترین</option>
-        <option value="bestselling" {% if current_params.sort == "bestselling" %}selected{% endif %}>پرفروش‌ترین</option>
+        <option
+            value="newest"
+            {% if current_params.sort == "newest" or not current_params.sort %}selected{% endif %}
+        >
+            جدیدترین
+        </option>
+
+        <option
+            value="cheapest"
+            {% if current_params.sort == "cheapest" %}selected{% endif %}
+        >
+            ارزان‌ترین
+        </option>
+
+        <option
+            value="expensive"
+            {% if current_params.sort == "expensive" %}selected{% endif %}
+        >
+            گران‌ترین
+        </option>
+
+        <option
+            value="bestselling"
+            {% if current_params.sort == "bestselling" %}selected{% endif %}
+        >
+            پرفروش‌ترین
+        </option>
     </select>
+
 </form>
