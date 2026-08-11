@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% block title %}
+  کمپین‌های فعال
+{% endblock %}
+
+{% block content %}
+  <h1>کمپین‌های فعال</h1>
+
+  {% if active_campaign and not active_campaign.is_running %}
+    <p class="order-status-note">⏱ این کمپین به پایان رسیده است.</p>
+  {% elif active_campaign %}
+    <p class="campaign-banner">در حال مشاهده‌ی محصولات کمپین «{{ active_campaign.title }}» — تا {{ active_campaign.end_at|date:'Y/m/d H:i' }}</p>
+  {% endif %}
+
+  {% if campaigns %}
+    <div class="campaign-grid">
+      {% for campaign in campaigns %}
+        <a href="{% url 'products:list' %}?campaign={{ campaign.slug }}" class="campaign-card">
+          <h3>{{ campaign.title }}</h3>
+          <p>
+            {% if campaign.discount_type == 'percentage' %}
+              {{ campaign.value|floatformat:0 }}٪ تخفیف
+            {% else %}
+              تا {{ campaign.value|floatformat:0 }} تومان تخفیف
+            {% endif %}
+          </p>
+          <p class="campaign-end">پایان: {{ campaign.end_at|date:'Y/m/d H:i' }}</p>
+        </a>
+      {% endfor %}
+    </div>
+
+    {% if is_paginated %}
+      <div class="pagination" id="product-pagination">
+        {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}" class="page-link">قبلی</a>
+        {% endif %}
+        <span>صفحه {{ page_obj.number }} از {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}" class="page-link">بعدی</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% else %}
+    <p>در حال حاضر کمپین فعالی وجود ندارد.</p>
+  {% endif %}
+{% endblock %}

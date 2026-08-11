@@ -222,3 +222,23 @@
     margin: 1rem 0;
     font-size: 0.9rem;
 }
+
+
+.campaign-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+.campaign-card {
+    display: block;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-decoration: none;
+    color: inherit;
+}
+.campaign-end {
+    color: #8a6d00;
+    font-size: 0.85rem;
+}

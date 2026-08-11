@@ -1,8 +1,25 @@
-{% extends "base.html" %}
-{% block title %}صفحه‌ی اصلی{% endblock %}
+{% extends 'base.html' %}
+{% block title %}
+  صفحه‌ی اصلی
+{% endblock %}
 
 {% block content %}
-{% include 'products/_product_row.html' with section_title="جدیدترین‌ها" section_products=new_products %}
-{% include 'products/_product_row.html' with section_title="پرفروش‌ترین‌ها" section_products=bestselling_products %}
-{% include 'products/_product_row.html' with section_title="تخفیف‌دارها" section_products=discounted_products %}
+  {% if active_campaigns %}
+    <section class="home-campaigns">
+      <h2>کمپین‌های فعال</h2>
+      <div class="campaign-grid">
+        {% for campaign in active_campaigns %}
+          <a href="{% url 'products:list' %}?campaign={{ campaign.slug }}" class="campaign-card">
+            <h3>{{ campaign.title }}</h3>
+            <p class="campaign-end">تا {{ campaign.end_at|date:'Y/m/d H:i' }}</p>
+          </a>
+        {% endfor %}
+      </div>
+      <a href="{% url 'products:campaign_list' %}" class="see-all-link">مشاهده‌ی همه‌ی کمپین‌ها ←</a>
+    </section>
+  {% endif %}
+
+  {% include 'products/_product_row.html' with section_title='جدیدترین‌ها' section_products=new_products %}
+  {% include 'products/_product_row.html' with section_title='پرفروش‌ترین‌ها' section_products=bestselling_products %}
+  {% include 'products/_product_row.html' with section_title='تخفیف‌دارها' section_products=discounted_products %}
 {% endblock %}

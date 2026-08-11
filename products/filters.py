@@ -75,6 +75,9 @@ def filter_products(base_queryset, params):
         )
         attr_filter_applied = True
 
+
+
+
     # Filter by minimum and maximum variant price.
     min_price = params.get('min_price')
     max_price = params.get('max_price')
@@ -85,6 +88,26 @@ def filter_products(base_queryset, params):
 
     if attr_filter_applied or min_price or max_price:
         qs = qs.distinct()
+
+
+
+    campaign_slug = params.get('campaign')
+    if campaign_slug:
+        from .models import Campaign
+
+        campaign = Campaign.objects.filter(
+            slug=campaign_slug,
+            is_active=True
+        ).first()
+
+        if campaign and campaign.is_running:
+            qs = qs.filter(
+                Q(campaigns=campaign) |
+                Q(category__campaigns=campaign) |
+                Q(brand__campaigns=campaign)
+            ).distinct()
+        else:
+            qs = qs.none()
 
     sort = params.get('sort', 'newest')
     if sort == 'cheapest':

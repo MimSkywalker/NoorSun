@@ -3,6 +3,8 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
+from django.db import models
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -14,7 +16,14 @@ from django.views.generic import (
 
 from .filters import filter_products
 from .forms import ProductForm, ProductImageForm
-from .models import Attribute, Brand, Category, Product, ProductImage
+from .models import (
+    Attribute,
+    Brand,
+    Category,
+    Product,
+    ProductImage,
+    Campaign,)
+
 from .services import (
     get_bestselling_products,
     get_discounted_products,
@@ -58,6 +67,12 @@ class ProductListView(ListView):
         }
 
         context['current_params'] = self.request.GET
+
+        campaign_slug = self.request.GET.get('campaign')
+        if campaign_slug:
+            context['active_campaign'] = Campaign.objects.filter(
+                slug=campaign_slug, is_active=True
+            ).first()
         return context
 
     def render_to_response(self, context, **response_kwargs):
@@ -163,4 +178,24 @@ class HomeView(TemplateView):
         context['new_products'] = get_new_products()
         context['bestselling_products'] = get_bestselling_products()
         context['discounted_products'] = get_discounted_products()
+
+        now = timezone.now()
+        context['active_campaigns'] = Campaign.objects.filter(
+            is_active=True, start_at__lte=now, end_at__gte=now
+        ).order_by('end_at')[:4]
+
         return context
+
+
+class CampaignListView(ListView):
+    model = Campaign
+    template_name = 'products/campaign_list.html'
+    context_object_name = 'campaigns'
+    paginate_by = 12
+
+    def get_queryset(self):
+        now = timezone.now()
+        # Just active Campaigns
+        return Campaign.objects.filter(
+            is_active=True, start_at__lte=now, end_at__gte=now
+        ).order_by('end_at')

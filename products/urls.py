@@ -13,4 +13,5 @@ urlpatterns = [
 
     path('<int:product_id>/images/add/', views.ProductImageCreateView.as_view(), name='image_add'),
     path('images/<int:pk>/delete/', views.ProductImageDeleteView.as_view(), name='image_delete'),
+    path('campaigns/', views.CampaignListView.as_view(), name='campaign_list'),
 ]
