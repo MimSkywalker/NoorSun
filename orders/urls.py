@@ -49,4 +49,7 @@ urlpatterns = [
     ),
 
     path('<int:order_id>/refund/request/', views.RefundRequestCreateView.as_view(), name='refund_request'),
+
+    path('cart/discount/apply/', views.CartApplyDiscountView.as_view(), name='cart_apply_discount'),
+path('cart/discount/remove/', views.CartRemoveDiscountView.as_view(), name='cart_remove_discount'),
 ]

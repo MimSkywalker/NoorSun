@@ -1,5 +1,15 @@
 from django.contrib import admin
-from .models import Cart, CartItem, Order, OrderItem, Payment, RefundRequest
+from .models import (
+    Cart,
+    CartItem,
+    Order,
+    OrderItem,
+    Payment,
+    RefundRequest,
+    DiscountCodeUsage,
+    DiscountCode,
+
+)
 
 
 class CartItemInline(admin.TabularInline):
@@ -54,3 +64,27 @@ class RefundRequestAdmin(admin.ModelAdmin):
         'order', 'payment', 'user', 'reason', 'refund_amount',
         'status', 'admin_note', 'processed_at', 'created_at',
     )
+
+
+class DiscountCodeUsageInline(admin.TabularInline):
+    model = DiscountCodeUsage
+    extra = 0
+    readonly_fields = ('user', 'order', 'discount_amount', 'created_at')
+    can_delete = False
+
+
+@admin.register(DiscountCode)
+class DiscountCodeAdmin(admin.ModelAdmin):
+    list_display = (
+        'code', 'discount_type', 'value', 'is_active',
+        'valid_from', 'valid_until', 'total_uses', 'max_uses',
+    )
+    list_filter = ('discount_type', 'is_active')
+    search_fields = ('code',)
+    filter_horizontal = ('categories', 'brands', 'products')
+    inlines = [DiscountCodeUsageInline]
+    list_editable = ('is_active',)
+
+    def total_uses(self, obj):
+        return obj.total_uses
+    total_uses.short_description = 'تعداد استفاده'

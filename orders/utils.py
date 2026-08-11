@@ -11,6 +11,7 @@ from django.db.models.functions import Greatest
 
 logger = logging.getLogger(__name__)
 
+
 def get_or_create_cart(request):
     """
       Return the active shopping cart for the current request.
@@ -159,7 +160,8 @@ def release_order_stock(order_id, new_status):
             # Decrease sales_count using the product snapshot.
             # Greatest(..., 0) prevents the value from becoming negative.
             Product.objects.filter(pk=product_id).update(
-                sales_count=Greatest(F('sales_count') - item.quantity, Value(0))
+                sales_count=Greatest(F('sales_count') -
+                                     item.quantity, Value(0))
             )
 
             # Check whether sales_count was clamped to zero.
@@ -176,6 +178,19 @@ def release_order_stock(order_id, new_status):
                     "— بررسی شود.",
                     product_id, order_id, item.quantity,
                 )
+
+        # Release the discount-code usage because this order was never
+        # finalized/paid. Therefore, it must not count toward max_uses
+        # or max_uses_per_user.
+        deleted_count, _ = order.discount_usages.all().delete()
+
+        if deleted_count:
+            logger.info(
+                "release_order_stock: مصرف کد تخفیف سفارش #%s "
+                "(وضعیت جدید=%s) آزاد شد.",
+                order_id,
+                new_status,
+            )
 
         # Update the order status only after all stock operations succeed.
         order.status = new_status
@@ -203,6 +218,3 @@ def check_and_expire_order(order):
         order.refresh_from_db()
 
     return order
-
-
-
