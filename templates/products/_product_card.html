@@ -45,8 +45,9 @@
             line-height: 1.7;
         ">{{ product.title }}</h3>
 
-    {% with variant=product.default_variant %}
-      {% if variant %}
+    
+{% with variant=product.default_variant %}
+    {% if variant %}
         <div style="
                     margin-top: auto;
                     padding: 8px 4px 2px;
@@ -55,28 +56,41 @@
                     gap: 8px;
                     flex-wrap: wrap;
                 ">
-          {% if variant.has_discount %}
-            <span style="
+
+            {% if variant.has_discount %}
+
+                <span style="
                             color: #9ca3af;
                             font-size: 13px;
                             text-decoration: line-through;
-                        ">{{ variant.price }} تومان</span>
+                        ">
+                    {{ variant.price }} تومان
+                </span>
 
-            <span style="
+                <span style="
                             color: #dc2626;
                             font-size: 17px;
                             font-weight: 800;
-                        ">{{ variant.discount_price }} تومان</span>
-          {% else %}
-            <span style="
+                        ">
+                    {{ variant.final_price }} تومان
+                </span>
+
+            {% else %}
+
+                <span style="
                             color: #16a34a;
                             font-size: 17px;
                             font-weight: 800;
-                        ">{{ variant.price }} تومان</span>
-          {% endif %}
+                        ">
+                    {{ variant.price }} تومان
+                </span>
+
+            {% endif %}
+
         </div>
-      {% endif %}
-    {% endwith %}
+    {% endif %}
+{% endwith %}
+
   </a>
 {% with variant=product.default_variant %}
     {% if variant %}

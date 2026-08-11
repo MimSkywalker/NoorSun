@@ -1,52 +1,144 @@
 <!DOCTYPE html>
+
 <html lang="fa" dir="rtl">
-<head>
-    <meta charset="UTF-8">
+  <head>
+    <meta charset="UTF-8" />
+
     <title>فاکتور {{ order.tracking_code }}</title>
+
     <style>
-        body { font-family: Tahoma, sans-serif; padding: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: right; }
-        .totals { margin-top: 20px; text-align: left; }
-        @media print {
-            .no-print { display: none; }
+      body {
+        font-family: Tahoma, sans-serif;
+        padding: 20px;
+      }
+      
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      
+      th,
+      td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: right;
+      }
+      
+      .totals {
+        margin-top: 20px;
+        text-align: left;
+      }
+      
+      .invoice-totals {
+        margin-top: 20px;
+      }
+      
+      .invoice-totals td {
+        padding: 8px;
+      }
+      
+      .invoice-discount-row {
+        font-weight: bold;
+      }
+      
+      .invoice-total-final {
+        font-weight: bold;
+      }
+      
+      @media print {
+        .no-print {
+          display: none;
         }
+      }
     </style>
-</head>
-<body>
+  </head>
+
+  <body>
     <h1>فاکتور فروش</h1>
+
     <p>کد رهگیری: {{ order.tracking_code }}</p>
-    <p>تاریخ: {{ order.created_at|date:"Y/m/d H:i" }}</p>
-    <p>گیرنده: {{ order.address_receiver_name }} — {{ order.address_receiver_phone }}</p>
-    <p>آدرس: {{ order.address_province_title }}، {{ order.address_city_title }} — {{ order.address_full_text }}</p>
+
+    <p>تاریخ: {{ order.created_at|date:'Y/m/d H:i' }}</p>
+
+    <p>گیرنده:
+      {{ order.address_receiver_name }}
+      —
+      {{ order.address_receiver_phone }}</p>
+
+    <p>آدرس:
+      {{ order.address_province_title }}،
+      {{ order.address_city_title }}
+      —
+      {{ order.address_full_text }}</p>
 
     <table>
-        <thead>
-            <tr><th>محصول</th><th>مشخصات</th><th>قیمت واحد</th><th>تعداد</th><th>جمع</th></tr>
-        </thead>
-        <tbody>
+      <thead>
+        <tr>
+          <th>محصول</th>
+          <th>مشخصات</th>
+          <th>قیمت واحد</th>
+          <th>تعداد</th>
+          <th>جمع</th>
+        </tr>
+      </thead>
+
+      <tbody>
         {% for item in order.items.all %}
-            <tr>
-                <td>{{ item.product_title }}</td>
-                <td>{{ item.variant_info }}</td>
-                <td>{{ item.unit_price }}</td>
-                <td>{{ item.quantity }}</td>
-                <td>{{ item.line_total }}</td>
-            </tr>
+          <tr>
+            <td>{{ item.product_title }}</td>
+
+            <td>{{ item.variant_info }}</td>
+
+            <td>{{ item.unit_price }}</td>
+
+            <td>{{ item.quantity }}</td>
+
+            <td>{{ item.line_total }}</td>
+          </tr>
         {% endfor %}
-        </tbody>
+      </tbody>
     </table>
 
-    <div class="totals">
-        <p>جمع کالاها: {{ order.subtotal }}</p>
-        <p>هزینه‌ی ارسال: {{ order.shipping_cost }}</p>
-        <p>بسته‌بندی: {{ order.packaging_cost }}</p>
-        <p><strong>جمع کل: {{ order.total }}</strong></p>
-    </div>
+    <table class="invoice-totals">
+      <tr>
+        <td>جمع کالاها</td>
+        <td>{{ order.subtotal|floatformat:0 }} تومان</td>
+      </tr>
+
+      <tr>
+        <td>هزینه ارسال</td>
+        <td>{{ order.shipping_cost|floatformat:0 }} تومان</td>
+      </tr>
+
+      <tr>
+        <td>بسته‌بندی</td>
+        <td>{{ order.packaging_cost|floatformat:0 }} تومان</td>
+      </tr>
+
+      {% if order.discount_amount > 0 %}
+        <tr class="invoice-discount-row">
+          <td>
+            تخفیف{% if order.discount_code_str %}
+              (کد: {{ order.discount_code_str }})
+            {% endif %}
+          </td>
+
+          <td>-{{ order.discount_amount|floatformat:0 }} تومان</td>
+        </tr>
+      {% endif %}
+
+      <tr class="invoice-total-final">
+        <td>مبلغ نهایی</td>
+
+        <td>{{ order.total|floatformat:0 }} تومان</td>
+      </tr>
+    </table>
 
     {% if not is_pdf %}
-    <button class="no-print" onclick="window.print()">چاپ</button>
-    <a class="no-print" href="{% url 'orders:order_invoice_pdf' order.pk %}">دانلود PDF</a>
+      <button class="no-print" onclick="window.print()">چاپ</button>
+
+      <a class="no-print" href="{% url 'orders:order_invoice_pdf' order.pk %}">دانلود PDF</a>
     {% endif %}
-</body>
+  </body>
 </html>
