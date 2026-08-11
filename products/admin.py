@@ -9,6 +9,7 @@ from .models import (
     Product,
     ProductImage,
     ProductVariant,
+    Campaign,
 )
 
 
@@ -139,3 +140,18 @@ class ProductVariantAdmin(admin.ModelAdmin):
         return obj.is_in_stock
     is_in_stock.boolean = True
     is_in_stock.short_description = "موجود؟"
+
+
+@admin.register(Campaign)
+class CampaignAdmin(admin.ModelAdmin):
+    list_display = ('title', 'discount_type', 'value',
+                    'start_at', 'end_at', 'is_active', 'is_running')
+    list_filter = ('is_active', 'discount_type')
+    prepopulated_fields = {'slug': ('title',)}
+    filter_horizontal = ('categories', 'brands', 'products')
+    list_editable = ('is_active',)
+
+    def is_running(self, obj):
+        return obj.is_running
+    is_running.boolean = True
+    is_running.short_description = 'در حال اجرا'

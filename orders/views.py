@@ -24,8 +24,13 @@ from .models import (
     RefundRequest,
     VariantInactiveError,
     create_order_from_cart,
+    DiscountCodeInvalidError,
 )
-
+from .discounts import (
+    apply_discount_code_to_cart,
+    remove_discount_code_from_cart
+)
+from .forms import DiscountCodeForm
 
 from .utils import (
     check_and_expire_order,
@@ -231,6 +236,12 @@ class CheckoutView(LoginRequiredMixin, View):
 
         except ValueError as e:
             messages.error(request, str(e))
+            return redirect('orders:cart_detail')
+
+        except DiscountCodeInvalidError as e:
+            messages.error(request, f"کد تخفیف دیگر معتبر نیست: {e.message}")
+            from .discounts import remove_discount_code_from_cart
+            remove_discount_code_from_cart(cart)
             return redirect('orders:cart_detail')
 
         # After creating the order, start the payment process directly.
@@ -506,9 +517,6 @@ class RefundRequestCreateView(LoginRequiredMixin, CreateView):
 
     def dispatch(self, request, *args, **kwargs):
 
-
-
-
         # Get the user's processing order
         if not request.user.is_authenticated:
             return self.handle_no_permission()
@@ -520,11 +528,10 @@ class RefundRequestCreateView(LoginRequiredMixin, CreateView):
             status=Order.Status.PROCESSING,
         )
 
-
         # Prevent duplicate refund requests
         existing_refund_request = RefundRequest.objects.filter(
-                order=self.order
-            ).first()
+            order=self.order
+        ).first()
 
         if existing_refund_request:
             messages.info(
@@ -597,3 +604,31 @@ class RefundRequestCreateView(LoginRequiredMixin, CreateView):
     def get_success_url(self):
         # Redirect to the order details after successful submission
         return reverse_lazy('orders:order_detail', kwargs={'pk': self.order.pk})
+
+
+class CartApplyDiscountView(View):
+    def post(self, request):
+        cart = get_or_create_cart(request)
+        form = DiscountCodeForm(request.POST)
+
+        if not form.is_valid():
+            messages.error(request, "کد تخفیف وارد نشده است.")
+            return redirect('orders:cart_detail')
+
+        ok, error = apply_discount_code_to_cart(
+            cart, form.cleaned_data['code'], request.user
+        )
+        if ok:
+            messages.success(request, "کد تخفیف با موفقیت اعمال شد.")
+        else:
+            messages.error(request, error)
+
+        return redirect('orders:cart_detail')
+
+
+class CartRemoveDiscountView(View):
+    def post(self, request):
+        cart = get_or_create_cart(request)
+        remove_discount_code_from_cart(cart)
+        messages.success(request, "کد تخفیف حذف شد.")
+        return redirect('orders:cart_detail')
