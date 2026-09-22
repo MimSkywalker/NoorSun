@@ -7,6 +7,7 @@ from django.views.generic import CreateView, ListView
 
 from .forms import TicketCreateForm, TicketMessageForm
 from .models import FAQ, Ticket, TicketMessage
+from core.throttling import check_throttle, record_failed_attempt
 
 
 class TicketCreateView(CreateView):
@@ -24,6 +25,17 @@ class TicketCreateView(CreateView):
         return kwargs
 
     def form_valid(self, form):
+        if not self.request.user.is_authenticated:
+            ip = get_client_ip(self.request)
+            identifier = form.cleaned_data.get(
+                'guest_phone') or form.cleaned_data.get('guest_email')
+            throttle_result = check_throttle(
+                scope='ticket_create', ip=ip, identifier=identifier)
+            if not throttle_result.allowed:
+                messages.error(
+                    self.request, "تعداد ثبت درخواست بیش از حد مجاز بود. کمی بعد تلاش کنید.")
+                return self.form_invalid(form)
+
         message_body = form.cleaned_data.pop('message')
         if self.request.user.is_authenticated:
             form.instance.guest_name = form.instance.guest_phone = form.instance.guest_email = ''

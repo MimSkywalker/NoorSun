@@ -285,6 +285,13 @@ class ReviewCreateView(CreateView):
         return context
 
     def form_valid(self, form):
+        if not self.request.user.is_authenticated:
+            ip = get_client_ip(self.request)
+            throttle_result = check_throttle(scope='review_create', ip=ip, identifier=None)
+            if not throttle_result.allowed:
+                messages.error(self.request, "تعداد ثبت نظر بیش از حد مجاز بود. کمی بعد تلاش کنید.")
+                return self.form_invalid(form)
+            
         if self.request.user.is_authenticated:
             form.instance.guest_name = ''
         messages.success(

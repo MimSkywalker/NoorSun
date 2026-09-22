@@ -21,6 +21,8 @@ from .models import OTPRequest
 
 from orders.utils import merge_guest_cart_into_user
 
+from core.throttling import check_throttle, record_failed_attempt, reset_throttle
+
 User = get_user_model()
 SESSION_LOGIN_NEXT_KEY = 'login_next_url'
 
@@ -96,6 +98,28 @@ class RequestOTPView(View):
 
         phone_number = form.cleaned_data['phone_number']
 
+        ip = get_client_ip(request)
+
+        throttle_result = check_throttle(
+            scope='otp_request',
+            ip=ip,
+            identifier=phone_number,
+        )
+        if not throttle_result.allowed:
+            messages.error(
+                request,
+                f"تعداد درخواست شما بیش از حد مجاز بود. لطفاً "
+                f"{throttle_result.retry_after_seconds // 60} دقیقه‌ی دیگر دوباره تلاش کنید."
+            )
+            return render(
+                request,
+                self.template_name,
+                {
+                    'form': form,
+                    'next': next_url or '',
+                }
+            )
+
         try:
             otp = OTPRequest.generate(
                 phone_number,
@@ -150,6 +174,18 @@ class VerifyOTPView(View):
         if not phone_number:
             return redirect(reverse('users:request_otp'))
 
+        ip = get_client_ip(request)
+
+        throttle_result = check_throttle(
+            scope='otp_verify', ip=ip, identifier=phone_number
+        )
+        if not throttle_result.allowed:
+            messages.error(
+                request, "تعداد تلاش شما بیش از حد مجاز بود. کمی بعد دوباره تلاش کنید."
+            )
+            request.session.pop(SESSION_PHONE_KEY, None)
+            return redirect(reverse('users:request_otp'))
+
         form = OTPVerifyForm(request.POST)
         if not form.is_valid():
             return render(request, self.template_name, {'form': form})
@@ -167,7 +203,12 @@ class VerifyOTPView(View):
             return redirect(reverse('users:request_otp'))
 
         ok, error = otp.verify(form.cleaned_data['code'])
+
         if not ok:
+
+            record_failed_attempt(scope='otp_verify',
+                                  ip=ip, identifier=phone_number)
+
             if otp.attempts >= otp.MAX_ATTEMPTS:
                 messages.error(
                     request, "تعداد تلاش مجاز تمام شده. دوباره درخواست دهید.")
@@ -175,6 +216,9 @@ class VerifyOTPView(View):
                 return redirect(reverse('users:request_otp'))
             messages.error(request, error)
             return render(request, self.template_name, {'form': form})
+
+        reset_throttle(scope='otp_verify', ip=ip, identifier=phone_number)
+        reset_throttle(scope='otp_request', ip=ip, identifier=phone_number)
 
         user, created = User.objects.get_or_create(
             phone_number=phone_number,
@@ -255,6 +299,16 @@ class PasswordResetRequestOTPView(View):
             return render(request, self.template_name, {'form': form})
 
         phone_number = form.cleaned_data['phone_number']
+        ip = get_client_ip(request)
+
+        throttle_result = check_throttle(
+            scope='password_reset_otp', ip=ip, identifier=phone_number
+        )
+        if not throttle_result.allowed:
+            messages.error(
+                request, "تعداد درخواست بیش از حد مجاز بود. کمی بعد دوباره تلاش کنید."
+            )
+            return render(request, self.template_name, {'form': form})
 
         if not User.objects.filter(phone_number=phone_number).exists():
             messages.success(
@@ -374,9 +428,15 @@ class EmailPasswordResetRequestView(View):
     def post(self, request):
         form = EmailPasswordResetForm(request.POST)
         if form.is_valid():
-            form.send_reset_email(request)
-        # همیشه به "done" هدایت می‌شه، چه ایمیل تطبیق داشته باشه چه نه —
-        # جلوگیری از افشای این‌که کدام ایمیل‌ها در سیستم ثبت‌شده‌اند.
+            email = form.cleaned_data['email']
+            ip = get_client_ip(request)
+
+            throttle_result = check_throttle(
+                scope='password_reset_email', ip=ip, identifier=email
+            )
+            if throttle_result.allowed:
+                form.send_reset_email(request)
+
         return redirect(reverse('users:password_reset_email_done'))
 
 
@@ -490,7 +550,7 @@ class PhoneLoginView(View):
     def post(self, request):
 
         if request.user.is_authenticated:
-            return redirect('profiles:detail')
+            return redirect(reverse('profiles:detail'))
 
         next_url = _get_safe_next_url(
             request,
@@ -504,14 +564,28 @@ class PhoneLoginView(View):
         if not form.is_valid():
             return render(request, self.template_name, {'form': form, 'next': next_url or '', })
 
+        phone_number = form.cleaned_data['phone_number']
+        ip = get_client_ip(request)
+
+        throttle_result = check_throttle(
+            scope='phone_login', ip=ip, identifier=phone_number)
+        if not throttle_result.allowed:
+            messages.error(
+                request, "تعداد تلاش ورود بیش از حد مجاز بود. کمی بعد دوباره تلاش کنید.")
+            return render(request, self.template_name, {'form': form, 'next': next_url or ''})
+
         user = authenticate(
             request,
-            username=form.cleaned_data['phone_number'],
+            username=phone_number,
             password=form.cleaned_data['password'],
         )
         if user is None:
+            record_failed_attempt(scope='phone_login',
+                                  ip=ip, identifier=phone_number)
             messages.error(request, "شماره موبایل یا رمز عبور اشتباه است.")
             return render(request, self.template_name, {'form': form, 'next': next_url or ''})
+
+        reset_throttle(scope='phone_login', ip=ip, identifier=phone_number)
 
         guest_session_key = request.session.session_key
         login(request, user)
