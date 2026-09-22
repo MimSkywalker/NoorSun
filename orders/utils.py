@@ -1,13 +1,16 @@
+import logging
+from datetime import timedelta
+
+from django.conf import settings
 from django.db import transaction
 from django.db.models import F, Value
-import logging
+from django.db.models.functions import Greatest
+from django.utils import timezone
+
+from products.models import Product, StockMovement
+from products.stock import record_stock_movement
 
 from .models import Cart, CartItem, Order, ProductVariant
-from products.models import Product
-from django.utils import timezone
-from datetime import timedelta
-from django.conf import settings
-from django.db.models.functions import Greatest
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +113,6 @@ def merge_guest_cart_into_user(request, user, guest_session_key=None):
     # Remove the guest cart after all of its items have been merged.
     guest_cart.delete()
 
-
 def release_order_stock(order_id, new_status):
     """
     Release the stock reserved for a pending order and update its status.
@@ -139,8 +141,11 @@ def release_order_stock(order_id, new_status):
         for item in order.items.select_related('variant', 'product'):
             if item.variant_id:
                 # Restore the quantity reserved by this order back to the variant stock.
-                ProductVariant.objects.filter(pk=item.variant_id).update(
-                    stock=F('stock') + item.quantity
+                record_stock_movement(
+                    variant=item.variant,
+                    quantity_change=item.quantity,
+                    movement_type=StockMovement.MovementType.RETURN,
+                    order=order,
                 )
 
             # Use the product snapshot stored on OrderItem instead of
@@ -153,22 +158,26 @@ def release_order_stock(order_id, new_status):
                 logger.warning(
                     "release_order_stock: آیتم #%s سفارش %s فاقد Snapshot "
                     "محصول است؛ sales_count برای این آیتم بازگردانده نشد.",
-                    item.pk, order_id,
+                    item.pk,
+                    order_id,
                 )
                 continue
 
             # Decrease sales_count using the product snapshot.
             # Greatest(..., 0) prevents the value from becoming negative.
             Product.objects.filter(pk=product_id).update(
-                sales_count=Greatest(F('sales_count') -
-                                     item.quantity, Value(0))
+                sales_count=Greatest(
+                    F('sales_count') - item.quantity,
+                    Value(0),
+                )
             )
 
             # Check whether sales_count was clamped to zero.
             current = Product.objects.filter(
                 pk=product_id
             ).values_list(
-                'sales_count', flat=True
+                'sales_count',
+                flat=True
             ).first()
 
             if current == 0:
@@ -176,7 +185,9 @@ def release_order_stock(order_id, new_status):
                     "release_order_stock: sales_count محصول %s هنگام آزادسازی "
                     "سفارش %s (تعداد آیتم=%s) به صفر چسبید؛ احتمال ناهم‌خوانی داده "
                     "— بررسی شود.",
-                    product_id, order_id, item.quantity,
+                    product_id,
+                    order_id,
+                    item.quantity,
                 )
 
         # Release the discount-code usage because this order was never

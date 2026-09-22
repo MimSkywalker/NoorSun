@@ -5,14 +5,24 @@ import string
 from datetime import date
 from decimal import Decimal
 
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
+from django.db.models import F
 from django.utils import timezone
 
 from core.models import TimeStampedModel
-from products.models import ProductVariant
+from products.models import ProductVariant, ProductVariant, Product, StockMovement
+from products.stock import record_stock_movement
+
+
+from django.core.mail import send_mail
+from django.urls import reverse
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -187,14 +197,36 @@ class Order(TimeStampedModel):
         ]
         ordering = ['-created_at']
 
+
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._original_status = self.status
+
     def save(self, *args, **kwargs):
-        # Generate tracking code automatically
+        # تولید خودکار کد رهگیری (باید قبل از super().save() انجام شود)
         if not self.tracking_code:
             code = generate_tracking_code()
             while Order.objects.filter(tracking_code=code).exists():
                 code = generate_tracking_code()
             self.tracking_code = code
+
+        is_status_change = self.pk is not None and self._original_status != self.status
+        previous_status = self._original_status
+
         super().save(*args, **kwargs)
+        self._original_status = self.status
+
+        if is_status_change:
+            self._notify_status_change(previous_status, self.status)
+
+    def _notify_status_change(self, previous_status, new_status):
+        from .notifications import notify_order_shipped, notify_order_delivered
+
+        if new_status == self.Status.SHIPPED:
+            notify_order_shipped(self)
+        elif new_status == self.Status.DELIVERED:
+            notify_order_delivered(self)
 
     def __str__(self):
         return self.tracking_code
@@ -330,11 +362,17 @@ def create_order_from_cart(cart, user, address):
 
     for item in items:
         variant = ProductVariant.objects.select_for_update().get(pk=item.variant_id)
-        variant.stock -= item.quantity
-        variant.save(update_fields=['stock'])
 
-        variant.product.sales_count += item.quantity
-        variant.product.save(update_fields=['sales_count'])
+        record_stock_movement(
+            variant=variant,
+            quantity_change=-item.quantity,
+            movement_type=StockMovement.MovementType.SALE,
+            order=order,
+        )
+
+        Product.objects.filter(pk=variant.product_id).update(
+            sales_count=F('sales_count') + item.quantity
+        )
 
         OrderItem.objects.create(
             order=order,
@@ -589,3 +627,7 @@ class DiscountCodeUsage(TimeStampedModel):
 
     def __str__(self):
         return f'{self.code.code} - {self.user.phone_number}'
+
+
+
+    

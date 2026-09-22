@@ -3,6 +3,8 @@ from django.db import models
 from django.utils.text import slugify
 from django.utils import timezone
 from core.models import TimeStampedModel
+from django.conf import settings
+from users.models import phone_validator
 
 from .utils import product_image_upload_path, process_product_image
 from .validators import validate_image_size, validate_image_extension
@@ -254,6 +256,12 @@ class ProductVariant(TimeStampedModel):
     promo_start = models.DateTimeField(null=True, blank=True)
     promo_end = models.DateTimeField(null=True, blank=True)
 
+    low_stock_threshold = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="خالی بگذارید تا مقدار پیش‌فرض سراسری (LOW_STOCK_THRESHOLD) استفاده شود."
+    )
+    low_stock_alert_sent = models.BooleanField(default=False, editable=False)
+
     class Meta:
         verbose_name = "تنوع محصول"
         verbose_name_plural = "تنوع‌های محصول"
@@ -334,6 +342,16 @@ class ProductVariant(TimeStampedModel):
     def has_discount(self):
         return self.final_price < self.price
 
+    @property
+    def effective_low_stock_threshold(self):
+        if self.low_stock_threshold is not None:
+            return self.low_stock_threshold
+        return settings.LOW_STOCK_THRESHOLD
+
+    @property
+    def is_low_stock(self):
+        return self.stock <= self.effective_low_stock_threshold
+
 
 class Campaign(TimeStampedModel):
     class DiscountType(models.TextChoices):
@@ -408,3 +426,115 @@ class Campaign(TimeStampedModel):
         if self.discount_type == self.DiscountType.PERCENTAGE:
             return base - (base * self.value / 100)
         return max(base - self.value, 0)
+
+
+class StockMovement(TimeStampedModel):
+    class MovementType(models.TextChoices):
+        PURCHASE = 'purchase', 'خرید از تأمین‌کننده'
+        SALE = 'sale', 'فروش'
+        RETURN = 'return', 'بازگشت سفارش'
+        MANUAL_ADJUSTMENT = 'manual_adjustment', 'تنظیم دستی'
+        DAMAGE = 'damage', 'خرابی/دورریز'
+
+    variant = models.ForeignKey(
+        ProductVariant, on_delete=models.CASCADE, related_name='stock_movements'
+    )
+    movement_type = models.CharField(
+        max_length=20, choices=MovementType.choices)
+    quantity_change = models.IntegerField(
+        help_text="مثبت = افزایش موجودی، منفی = کاهش موجودی"
+    )
+    stock_after = models.PositiveIntegerField(editable=False)
+    note = models.TextField(blank=True)
+    order = models.ForeignKey(
+        'orders.Order', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='stock_movements'
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='stock_movements_made',
+        help_text="فقط برای ثبت دستی از پنل ادمین؛ برای رکوردهای خودکار خالی می‌ماند."
+    )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['variant', 'created_at']),
+            models.Index(fields=['movement_type']),
+        ]
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.get_movement_type_display()} | {self.variant} | {self.quantity_change:+d}'
+
+
+class RestockRequest(TimeStampedModel):
+    variant = models.ForeignKey(
+        ProductVariant, on_delete=models.CASCADE, related_name='restock_requests'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='restock_requests'
+    )
+    phone_number = models.CharField(
+        max_length=11, blank=True, validators=[phone_validator])
+    email = models.EmailField(blank=True)
+    is_notified = models.BooleanField(default=False)
+    notified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['variant', 'is_notified']),
+        ]
+
+    def clean(self):
+        if not self.phone_number and not self.email:
+            raise ValidationError(
+                "حداقل یکی از شماره موبایل یا ایمیل را وارد کنید.")
+
+    def __str__(self):
+        return f'RestockRequest | {self.variant} | {self.phone_number or self.email}'
+
+
+
+class Review(TimeStampedModel):
+    RATING_CHOICES = [(i, str(i)) for i in range(1, 6)]
+
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='reviews'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='reviews',
+    )
+    guest_name = models.CharField(max_length=100, blank=True)
+    rating = models.PositiveSmallIntegerField(choices=RATING_CHOICES)
+    text = models.TextField()
+    is_approved = models.BooleanField(default=False)
+    admin_reply = models.TextField(blank=True)
+    admin_replied_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['product', 'is_approved']),
+        ]
+
+    def clean(self):
+        # Login_user
+        if not self.user_id and not self.guest_name:
+            raise ValidationError("برای ثبت نظر به‌عنوان مهمان، وارد کردن نام الزامی است.")
+
+    @property
+    def display_name(self):
+        if self.user_id:
+            full_name = f"{self.user.first_name} {self.user.last_name}".strip()
+            return full_name or self.user.phone_number
+        return self.guest_name or "کاربر مهمان"
+
+    def save(self, *args, **kwargs):
+        if self.admin_reply and not self.admin_replied_at:
+            self.admin_replied_at = timezone.now()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'Review #{self.pk} - {self.product.title} - {self.rating}/5'

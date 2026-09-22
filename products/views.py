@@ -15,14 +15,17 @@ from django.views.generic import (
 )
 
 from .filters import filter_products
-from .forms import ProductForm, ProductImageForm
+from .forms import ProductForm, ProductImageForm, RestockRequestForm, ReviewForm
 from .models import (
     Attribute,
     Brand,
     Category,
     Product,
     ProductImage,
-    Campaign,)
+    Campaign,
+    RestockRequest,
+    ProductVariant,
+    Review)
 
 from .services import (
     get_bestselling_products,
@@ -104,6 +107,7 @@ class ProductDetailView(DetailView):
         context['similar_products'] = attach_campaign_prices(
             get_similar_products(self.object))
         context['is_unavailable'] = not self.object.is_active
+        context['approved_reviews'] = self.object.reviews.filter(is_approved=True).select_related('user')
         return context
 
 
@@ -204,3 +208,90 @@ class CampaignListView(ListView):
         return Campaign.objects.filter(
             is_active=True, start_at__lte=now, end_at__gte=now
         ).order_by('end_at')
+
+
+class RestockRequestCreateView(CreateView):
+    model = RestockRequest
+    form_class = RestockRequestForm
+    template_name = 'products/restock_request_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.variant = get_object_or_404(
+            ProductVariant, pk=kwargs['variant_id'])
+        if self.variant.stock > 0:
+            messages.info(request, "این کالا در حال حاضر موجود است.")
+            return redirect('products:detail', pk=self.variant.product_id)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        initial = super().get_initial()
+        if self.request.user.is_authenticated:
+            initial['phone_number'] = self.request.user.phone_number
+            if self.request.user.profile.email:
+                initial['email'] = self.request.user.profile.email
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['variant'] = self.variant
+        return context
+
+    def form_valid(self, form):
+        form.instance.variant = self.variant
+        if self.request.user.is_authenticated:
+            form.instance.user = self.request.user
+
+        already_requested = RestockRequest.objects.filter(
+            variant=self.variant,
+            is_notified=False,
+            phone_number=form.instance.phone_number,
+        ).exists()
+        if already_requested and form.instance.phone_number:
+            messages.info(
+                self.request, "شما قبلاً برای این کالا درخواست ثبت کرده‌اید.")
+            return redirect('products:detail', pk=self.variant.product_id)
+
+        messages.success(
+            self.request,
+            "درخواست شما ثبت شد؛ به‌محض موجود شدن این کالا به شما اطلاع می‌دهیم."
+        )
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('products:detail', kwargs={'pk': self.variant.product_id})
+
+
+class ReviewCreateView(CreateView):
+    model = Review
+    form_class = ReviewForm
+    template_name = 'products/review_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.product = get_object_or_404(Product, pk=kwargs['product_id'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        instance = Review(product=self.product)
+        if self.request.user.is_authenticated:
+            instance.user = self.request.user
+        kwargs['instance'] = instance
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['product'] = self.product
+        return context
+
+    def form_valid(self, form):
+        if self.request.user.is_authenticated:
+            form.instance.guest_name = ''
+        messages.success(
+            self.request,
+            "نظر شما ثبت شد و پس از بررسی و تأیید مدیر نمایش داده خواهد شد."
+        )
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('products:detail', kwargs={'pk': self.product.pk})
