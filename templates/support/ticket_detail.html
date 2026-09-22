@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ ticket.subject }}{% endblock %}
+{% block content %}
+<h2>{{ ticket.subject }} — {{ ticket.get_status_display }}</h2>
+<div class="ticket-thread">
+    {% for message in ticket.messages.all %}
+        <div class="ticket-message ticket-message-{{ message.sender_type }}">
+            <strong>{% if message.sender_type == 'admin' %}پشتیبانی{% else %}شما{% endif %}</strong>
+            <span class="ticket-message-time">{{ message.created_at }}</span>
+            <p>{{ message.body }}</p>
+        </div>
+    {% endfor %}
+</div>
+{% if ticket.status != 'closed' %}
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">ارسال پیام</button>
+</form>
+{% else %}
+<p>این تیکت بسته شده است.</p>
+{% endif %}
+{% endblock %}

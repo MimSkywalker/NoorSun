@@ -17,7 +17,7 @@ phone_validator = RegexValidator(
 
 class UserManager(BaseUserManager):
     """
-    creat a new user model base on phon number
+    create a new user model base on phon number
     """
 
     def create_user(self, phone_number, password=None, **extra_fields):

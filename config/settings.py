@@ -50,7 +50,9 @@ INSTALLED_APPS = [
     'products',
     'users',
     'profiles',
-    'addresses'
+    'addresses',
+    'notifications',
+    'support',
 ]
 
 MIDDLEWARE = [
@@ -182,6 +184,33 @@ ORDER_PAYMENT_TIMEOUT_MINUTES = env.int(
     'ORDER_PAYMENT_TIMEOUT_MINUTES', default=60)
 
 
-# Refund time and penalty setting 
+# Refund time and penalty setting
 REFUND_WINDOW_MINUTES = env.int('REFUND_WINDOW_MINUTES', default=60)
 REFUND_PENALTY_PERCENT = env.int('REFUND_PENALTY_PERCENT', default=10)
+
+
+# STOCK MANAGER setting
+LOW_STOCK_THRESHOLD = env.int('LOW_STOCK_THRESHOLD', default=5)
+ADMIN_ALERT_PHONE = env('ADMIN_ALERT_PHONE', default='')
+
+
+# SMS
+SMS_BACKEND = env('SMS_BACKEND', default='mock')
+
+# SMS OTP (Verify/Lookup) 
+SMS_OTP_BACKEND = env('SMS_OTP_BACKEND', default='mock')
+
+KAVENEGAR_API_KEY = env('KAVENEGAR_API_KEY', default='')
+KAVENEGAR_SENDER = env('KAVENEGAR_SENDER', default='')
+KAVENEGAR_OTP_TEMPLATE = env('KAVENEGAR_OTP_TEMPLATE', default='')
+
+# --- Email ---
+EMAIL_HOST = env('EMAIL_HOST', default='')
+EMAIL_PORT = env.int('EMAIL_PORT', default=587)
+EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
+
+
+SITE_BASE_URL = env('SITE_BASE_URL', default='http://127.0.0.1:8000')

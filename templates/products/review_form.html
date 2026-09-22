@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}ثبت نظر{% endblock %}
+{% block content %}
+<div class="review-form-box">
+    <h2>ثبت نظر برای {{ product.title }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">ثبت نظر</button>
+    </form>
+</div>
+{% endblock %}

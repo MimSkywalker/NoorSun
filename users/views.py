@@ -4,7 +4,9 @@ from django.contrib.auth import login, logout, authenticate
 
 from .forms import PhoneNumberForm, OTPVerifyForm, PhoneLoginForm, RegisterWithPasswordForm
 from .models import User, OTPRequest
-from .services import sms_service
+from .services import MockSMSService
+from notifications.sms import get_sms_service
+from notifications.sms import get_otp_service
 
 from django.contrib.auth import get_user_model, REDIRECT_FIELD_NAME
 from django.contrib.auth.tokens import default_token_generator
@@ -16,12 +18,14 @@ from django.views import View
 
 from .forms import PhoneNumberForm, OTPVerifyForm, SetNewPasswordForm, EmailPasswordResetForm
 from .models import OTPRequest
-from .services import sms_service
 
 from orders.utils import merge_guest_cart_into_user
 
 User = get_user_model()
 SESSION_LOGIN_NEXT_KEY = 'login_next_url'
+
+sms_service = get_sms_service()
+otp_service = get_otp_service()
 
 
 def _get_safe_next_url(request, candidate):
@@ -108,7 +112,7 @@ class RequestOTPView(View):
                 }
             )
 
-        sms_service.send_otp(phone_number, otp.code)
+        otp_service.send_otp(phone_number, otp.code)
 
         request.session[SESSION_PHONE_KEY] = phone_number
 
@@ -264,7 +268,7 @@ class PasswordResetRequestOTPView(View):
             messages.error(request, str(e))
             return render(request, self.template_name, {'form': form})
 
-        sms_service.send_otp(phone_number, otp.code)
+        otp_service.send_otp(phone_number, otp.code)
         request.session[SESSION_PWRESET_PHONE_KEY] = phone_number
         messages.success(request, "کد بازیابی ارسال شد.")
         return redirect(reverse('users:password_reset_verify_otp'))

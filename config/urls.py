@@ -31,6 +31,8 @@ urlpatterns = [
     path('profile/', include('profiles.urls')),
     path('addresses/', include('addresses.urls')),
     path('orders/', include('orders.urls')),
+    path('notifications/', include('notifications.urls')),
+    path('support/', include('support.urls')),
 ]
 
 if settings.DEBUG:

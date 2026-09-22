@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}نظرسنجی رضایت خرید{% endblock %}
+{% block content %}
+<div class="survey-box">
+    <h2>نظر شما درباره‌ی سفارش {{ survey.order.tracking_code }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">ثبت نظر</button>
+    </form>
+</div>
+{% endblock %}

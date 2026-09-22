@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}سؤالات متداول{% endblock %}
+{% block content %}
+<h2>سؤالات متداول</h2>
+<div class="faq-list">
+    {% for faq in faqs %}
+        <details class="faq-item">
+            <summary>{{ faq.question }}</summary>
+            <p>{{ faq.answer }}</p>
+        </details>
+    {% empty %}
+        <p>سؤالی ثبت نشده است.</p>
+    {% endfor %}
+</div>
+{% endblock %}

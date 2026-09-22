@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}تیکت‌های من{% endblock %}
+{% block content %}
+<h2>تیکت‌های من</h2>
+<ul class="ticket-list">
+    {% for ticket in tickets %}
+        <li><a href="{% url 'support:ticket_detail' ticket.pk %}">{{ ticket.subject }}</a> — {{ ticket.get_status_display }}</li>
+    {% empty %}
+        <li>هنوز تیکتی ثبت نکرده‌اید.</li>
+    {% endfor %}
+</ul>
+<a href="{% url 'support:ticket_create' %}" class="btn btn-primary">تیکت جدید</a>
+{% endblock %}

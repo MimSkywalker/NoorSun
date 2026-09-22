@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}تماس با ما{% endblock %}
+{% block content %}
+<div class="ticket-form-box">
+    <h2>تماس با پشتیبانی</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">ارسال</button>
+    </form>
+</div>
+{% endblock %}
