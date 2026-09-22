@@ -12,7 +12,7 @@
       {% csrf_token %}
       <br /><br />
       <button type="submit" class="btn btn-danger">بله، حذف کن</button>
-      <a href="{% url 'products:detail' object.product_id %}" class="btn btn-secondary">انصراف</a>
+      <a href="{% url 'products:detail' slug=object.product.slug %}" class="btn btn-secondary">انصراف</a>
     </form>
   </div>
 {% endblock %}

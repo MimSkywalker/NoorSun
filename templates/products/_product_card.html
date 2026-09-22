@@ -9,7 +9,7 @@
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     height: 100%;
 ">
-  <a href="{% url 'products:detail' product.pk %}" style="
+  <a href="{% url 'products:detail' slug=product.slug %}" style="
            display: flex;
            flex-direction: column;
            height: 100%;

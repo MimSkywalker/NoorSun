@@ -97,9 +97,12 @@ class ProductDetailView(DetailView):
     template_name = 'products/product_detail.html'
     context_object_name = 'product'
 
+    slug_field = 'slug'
+    slug_url_kwarg = 'slug'
+
     def get_queryset(self):
         return Product.objects.select_related('category', 'brand').prefetch_related(
-            'images', 'variants', 'variants__attribute_values'
+            'images', 'variants', 'variants__attribute_values', 'reviews'
         )
 
     def get_context_data(self, **kwargs):

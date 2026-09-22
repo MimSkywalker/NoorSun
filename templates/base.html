@@ -2,18 +2,33 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>
-      {% block title %}
-        فروشگاه
-      {% endblock %}
-    </title>
-    <link rel="stylesheet" href="{% static 'css/main.css' %}" />
-    {% block extra_css %}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}فروشگاه{% endblock %} | نام فروشگاه</title>
 
+    <meta name="description" content="{% block meta_description %}فروشگاه اینترنتی با بهترین قیمت‌ها و ارسال سریع{% endblock %}">
+
+    {% block og_tags %}
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{% block og_title %}فروشگاه{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}فروشگاه اینترنتی با بهترین قیمت‌ها و ارسال سریع{% endblock %}">
+    <meta property="og:url" content="{{ request.build_absolute_uri }}">
+    <meta property="og:site_name" content="نام فروشگاه">
+    {% block og_image %}<meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/default-og.jpg' %}">{% endblock %}
     {% endblock %}
-  </head>
+
+    {% block twitter_tags %}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{% block twitter_title %}فروشگاه{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}فروشگاه اینترنتی با بهترین قیمت‌ها و ارسال سریع{% endblock %}">
+    {% block twitter_image %}<meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'images/default-og.jpg' %}">{% endblock %}
+    {% endblock %}
+
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+
+
   <body>
     <header>
       <nav>

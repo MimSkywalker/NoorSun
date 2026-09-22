@@ -1,13 +1,42 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
 
-{% block title %}
-{{ product.title }}
-{% endblock %}
-
+{% block title %}{{ product.title }}{% endblock %}
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/product.css' %}" />
 {% endblock %}
+{% block meta_description %}{{ product.description|striptags|truncatewords:25 }}{% endblock %}
+
+{% block og_title %}{{ product.title }}{% endblock %}
+{% block og_description %}{{ product.description|striptags|truncatewords:25 }}{% endblock %}
+{% block og_tags %}
+    {{ block.super }}
+    <meta property="og:type" content="product">
+    {% if product.default_variant %}
+    <meta property="product:price:amount" content="{{ product.default_variant.final_price }}">
+    <meta property="product:price:currency" content="IRR">
+    {% endif %}
+{% endblock %}
+{% block og_image %}
+    {% if product.main_image %}
+    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ product.main_image.image.url }}">
+    {% else %}
+    {{ block.super }}
+    {% endif %}
+{% endblock %}
+
+{% block twitter_title %}{{ product.title }}{% endblock %}
+{% block twitter_description %}{{ product.description|striptags|truncatewords:25 }}{% endblock %}
+{% block twitter_image %}
+    {% if product.main_image %}
+    <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{{ product.main_image.image.url }}">
+    {% else %}
+    {{ block.super }}
+    {% endif %}
+{% endblock %}
+
+
+
 
 {% block content %}
 <div style="
@@ -219,7 +248,7 @@
       {% if product.replacement_product %}
       <p>
         می‌توانید محصول جایگزین را مشاهده کنید:
-        <a href="{% url 'products:detail' product.replacement_product.pk %}">{{ product.replacement_product.title }}</a>
+        <a href="{% url 'products:detail' slug=product.replacement_product.slug %}">{{ product.replacement_product.title }}</a>
       </p>
       {% endif %}
     </div>

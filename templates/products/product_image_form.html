@@ -12,6 +12,6 @@
       {{ form.as_p }}
       <button type="submit" class="btn">آپلود تصویر</button>
     </form>
-    <a href="{% url 'products:detail' product.pk %}">← بازگشت به محصول</a>
+    <a href="{% url 'products:detail' slug=product.slug %}">← بازگشت به محصول</a>
   </div>
 {% endblock %}

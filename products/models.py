@@ -158,7 +158,13 @@ class Product(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.title, allow_unicode=True)
+            base_slug = slugify(self.title, allow_unicode=True)
+            slug = base_slug
+            counter = 1
+            while Product.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                counter += 1
+                slug = f'{base_slug}-{counter}'
+            self.slug = slug
         super().save(*args, **kwargs)
 
 

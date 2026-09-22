@@ -1,8 +1,40 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
 
-{% block title %}
-  محصولات
+{% block title %}محصولات{% endblock %}
+
+{% block meta_description %}{{ product.description|striptags|truncatewords:25 }}{% endblock %}
+
+{% block og_title %}محصولات{% endblock %}
+{% block og_description %}{{ product.description|striptags|truncatewords:25 }}{% endblock %}
+{% block og_tags %}
+    {{ block.super }}
+    <meta property="og:type" content="product">
+    {% if product.default_variant %}
+    <meta property="product:price:amount" content="{{ product.default_variant.final_price }}">
+    <meta property="product:price:currency" content="IRR">
+    {% endif %}
+{% endblock %}
+{% block og_image %}
+    {% if product.main_image %}
+    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ product.main_image.image.url }}">
+    {% else %}
+    {{ block.super }}
+    {% endif %}
+{% endblock %}
+
+{% block twitter_title %}{{ product.title }}{% endblock %}
+{% block twitter_description %}{{ product.description|striptags|truncatewords:25 }}{% endblock %}
+{% block twitter_image %}
+    {% if product.main_image %}
+    <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{{ product.main_image.image.url }}">
+    {% else %}
+    {{ block.super }}
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {# محتوای موجود صفحه‌ی محصول از فاز۱/۳/۴/۷/۸، بدون تغییر #}
 {% endblock %}
 
 {% block content %}
