@@ -42,6 +42,7 @@ INSTALLED_APPS = [
 
     # Tools
     "debug_toolbar",
+    'django_recaptcha',
 
 
     # Apps
@@ -214,3 +215,14 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
 
 
 SITE_BASE_URL = env('SITE_BASE_URL', default='http://127.0.0.1:8000')
+
+
+
+
+# --- reCAPTCHA v3 ---
+RECAPTCHA_PUBLIC_KEY = env('RECAPTCHA_PUBLIC_KEY', default='')
+RECAPTCHA_PRIVATE_KEY = env('RECAPTCHA_PRIVATE_KEY', default='')
+
+RECAPTCHA_REQUIRED_SCORE = env.float('RECAPTCHA_REQUIRED_SCORE', default=0.5)
+
+SILENCED_SYSTEM_CHECKS = ['django_recaptcha.recaptcha_test_key_error'] if DEBUG else []

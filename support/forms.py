@@ -1,9 +1,9 @@
 from django import forms
 
 from .models import Ticket, TicketMessage
+from core.forms import RecaptchaFormMixin
 
-
-class TicketCreateForm(forms.ModelForm):
+class TicketCreateForm(RecaptchaFormMixin, forms.ModelForm):
     message = forms.CharField(widget=forms.Textarea, label="متن پیام")
 
     class Meta:

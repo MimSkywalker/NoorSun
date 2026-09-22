@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.core.exceptions import ValidationError as DjangoValidationError
+from core.forms import RecaptchaFormMixin
 
 User = get_user_model()
 
@@ -22,6 +23,7 @@ PASSWORD_ERROR_MESSAGES_FA = {
     'password_too_similar': "رمز عبور نباید شبیه به اطلاعات شخصی شما (مثل شماره موبایل) باشد.",
 }
 
+
 def validate_password_fa(password, user=None):
     try:
         validate_password(password, user=user)
@@ -31,13 +33,14 @@ def validate_password_fa(password, user=None):
             code = getattr(error, 'code', None)
             params = error.params or {}
             if code in PASSWORD_ERROR_MESSAGES_FA:
-                fa_messages.append(PASSWORD_ERROR_MESSAGES_FA[code].format(**params))
+                fa_messages.append(
+                    PASSWORD_ERROR_MESSAGES_FA[code].format(**params))
             else:
                 fa_messages.append(str(error.message))
         raise forms.ValidationError(fa_messages)
 
-    
-class PhoneNumberForm(forms.Form):
+
+class PhoneNumberForm(RecaptchaFormMixin, forms.Form):
 
     """
     Form for collecting the user's phone number.
@@ -54,7 +57,7 @@ class PhoneNumberForm(forms.Form):
     )
 
 
-class OTPVerifyForm(forms.Form):
+class OTPVerifyForm(RecaptchaFormMixin, forms.Form):
     """
     Form for verifying a one-time password (OTP).
 
@@ -71,7 +74,7 @@ class OTPVerifyForm(forms.Form):
     )
 
 
-class SetNewPasswordForm(forms.Form):
+class SetNewPasswordForm(RecaptchaFormMixin, forms.Form):
     """
     Form for setting a new password after successful verification.
 
@@ -81,9 +84,11 @@ class SetNewPasswordForm(forms.Form):
 
     It validates password confirmation and applies Django's
     built-in password validation rules.
-    """   
-    new_password1 = forms.CharField(label="رمز عبور جدید", widget=forms.PasswordInput)
-    new_password2 = forms.CharField(label="تکرار رمز عبور جدید", widget=forms.PasswordInput)
+    """
+    new_password1 = forms.CharField(
+        label="رمز عبور جدید", widget=forms.PasswordInput)
+    new_password2 = forms.CharField(
+        label="تکرار رمز عبور جدید", widget=forms.PasswordInput)
 
     def clean(self):
         cleaned = super().clean()
@@ -95,7 +100,7 @@ class SetNewPasswordForm(forms.Form):
         return cleaned
 
 
-class EmailPasswordResetForm(forms.Form):
+class EmailPasswordResetForm(RecaptchaFormMixin, forms.Form):
     """
     Form for requesting password reset through email.
 
@@ -113,7 +118,7 @@ class EmailPasswordResetForm(forms.Form):
         Returns users matching the provided email address
         and meeting the required password reset conditions.
         """
-    
+
         email = self.cleaned_data['email']
         return User.objects.filter(
             profile__email__iexact=email,
@@ -130,14 +135,15 @@ class EmailPasswordResetForm(forms.Form):
         - Generates a temporary reset token.
         - Builds the reset URL.
         - Sends the reset email.
-        """        
+        """
         for user in self.get_matching_users():
             if not user.has_usable_password():
                 continue
             uid = urlsafe_base64_encode(force_bytes(user.pk))
             token = default_token_generator.make_token(user)
             reset_link = request.build_absolute_uri(
-                reverse('users:password_reset_confirm', kwargs={'uidb64': uid, 'token': token})
+                reverse('users:password_reset_confirm',
+                        kwargs={'uidb64': uid, 'token': token})
             )
             message = render_to_string('users/password_reset_email.txt', {
                 'user': user, 'reset_link': reset_link,
@@ -150,11 +156,12 @@ class EmailPasswordResetForm(forms.Form):
             )
 
 
-
-class RegisterWithPasswordForm(forms.Form):
-    phone_number = forms.CharField(max_length=11, validators=[phone_validator], label="شماره موبایل")
+class RegisterWithPasswordForm(RecaptchaFormMixin, forms.Form):
+    phone_number = forms.CharField(max_length=11, validators=[
+                                   phone_validator], label="شماره موبایل")
     password1 = forms.CharField(label="رمز عبور", widget=forms.PasswordInput)
-    password2 = forms.CharField(label="تکرار رمز عبور", widget=forms.PasswordInput)
+    password2 = forms.CharField(
+        label="تکرار رمز عبور", widget=forms.PasswordInput)
 
     def clean_phone_number(self):
         phone_number = self.cleaned_data['phone_number']
@@ -170,10 +177,11 @@ class RegisterWithPasswordForm(forms.Form):
         if p1 and p2 and p1 != p2:
             raise forms.ValidationError("رمزهای وارد شده یکسان نیستند.")
         if p1:
-            validate_password_fa(p1) 
+            validate_password_fa(p1)
         return cleaned
 
 
-class PhoneLoginForm(forms.Form):
-    phone_number = forms.CharField(max_length=11, validators=[phone_validator], label="شماره موبایل")
+class PhoneLoginForm(RecaptchaFormMixin, forms.Form):
+    phone_number = forms.CharField(max_length=11, validators=[
+                                   phone_validator], label="شماره موبایل")
     password = forms.CharField(label="رمز عبور", widget=forms.PasswordInput)

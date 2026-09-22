@@ -1,7 +1,7 @@
 from django import forms
 
 from .models import Product, ProductImage, RestockRequest, StockMovement, Review
-
+from core.forms import RecaptchaFormMixin
 
 class ProductForm(forms.ModelForm):
     class Meta:
@@ -76,7 +76,7 @@ class StockMovementAdminForm(forms.ModelForm):
 
 
 
-class ReviewForm(forms.ModelForm):
+class ReviewForm(RecaptchaFormMixin,forms.ModelForm):
     guest_name = forms.CharField(max_length=100, required=False, label="نام شما (برای مهمان)")
 
     class Meta:
