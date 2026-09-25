@@ -22,6 +22,24 @@ from django.conf.urls.static import static
 from products.views import HomeView
 
 
+
+from django.contrib.sitemaps.views import sitemap
+from core.sitemaps import (
+    ProductSitemap, CategorySitemap, BrandSitemap,
+    CampaignSitemap, FAQSitemap, StaticViewSitemap,
+)
+from core.views import robots_txt
+
+sitemaps = {
+    'products': ProductSitemap,
+    'categories': CategorySitemap,
+    'brands': BrandSitemap,
+    'campaigns': CampaignSitemap,
+    'faq': FAQSitemap,
+    'static': StaticViewSitemap,
+}
+
+
 urlpatterns = [
     path('', HomeView.as_view(), name='home'),
 
@@ -33,6 +51,9 @@ urlpatterns = [
     path('orders/', include('orders.urls')),
     path('notifications/', include('notifications.urls')),
     path('support/', include('support.urls')),
+
+    path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
+    path('robots.txt', robots_txt, name='robots_txt'),
 ]
 
 if settings.DEBUG:

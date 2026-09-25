@@ -21,7 +21,8 @@ from .models import OTPRequest
 
 from orders.utils import merge_guest_cart_into_user
 
-from core.throttling import check_throttle, record_failed_attempt, reset_throttle
+from core.throttling import check_throttle, record_failed_attempt, reset_throttle, record_failed_attempt, get_client_ip, reset_throttle
+
 
 User = get_user_model()
 SESSION_LOGIN_NEXT_KEY = 'login_next_url'

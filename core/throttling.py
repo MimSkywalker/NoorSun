@@ -32,16 +32,18 @@ class ThrottleRule:
     """
 
     """
+
     def __init__(self, max_attempts: int, window_seconds: int, block_seconds: int):
         self.max_attempts = max_attempts
         self.window_seconds = window_seconds
         self.block_seconds = block_seconds
 
 
+RULE_IP_DEFAULT = ThrottleRule(
+    max_attempts=20, window_seconds=15 * 60, block_seconds=30 * 60)
 
-RULE_IP_DEFAULT = ThrottleRule(max_attempts=20, window_seconds=15 * 60, block_seconds=30 * 60)
-# شناسه (شماره موبایل/ایمیل): محدودیت سخت‌گیرانه‌تر، مستقیماً روی یک حساب
-RULE_IDENTIFIER_DEFAULT = ThrottleRule(max_attempts=5, window_seconds=15 * 60, block_seconds=30 * 60)
+RULE_IDENTIFIER_DEFAULT = ThrottleRule(
+    max_attempts=5, window_seconds=15 * 60, block_seconds=30 * 60)
 
 
 def get_client_ip(request) -> str:
@@ -79,8 +81,15 @@ def _record_attempt(scope: str, kind: str, value: str, rule: ThrottleRule) -> No
         cache.set(key, 1, timeout=rule.window_seconds)
         count = 1
 
-    if count >= rule.max_attempts:
-        cache.set(_block_key(scope, kind, value), True, timeout=rule.block_seconds)
+    if count < rule.max_attempts:
+        return
+
+    block_key = _block_key(scope, kind, value)
+    already_blocked = cache.get(block_key)
+
+    cache.set(block_key, True, timeout=rule.block_seconds)
+
+    if not already_blocked:
         logger.warning(
             "Throttle: %s/%s='%s' پس از %s تلاش ناموفق، به مدت %s ثانیه مسدود شد.",
             scope, kind, value, count, rule.block_seconds,
@@ -88,8 +97,8 @@ def _record_attempt(scope: str, kind: str, value: str, rule: ThrottleRule) -> No
 
 
 def check_throttle(scope: str, ip: str, identifier: Optional[str] = None,
-                    ip_rule: ThrottleRule = RULE_IP_DEFAULT,
-                    identifier_rule: ThrottleRule = RULE_IDENTIFIER_DEFAULT) -> ThrottleResult:
+                   ip_rule: ThrottleRule = RULE_IP_DEFAULT,
+                   identifier_rule: ThrottleRule = RULE_IDENTIFIER_DEFAULT) -> ThrottleResult:
     """
 
     """
@@ -106,8 +115,8 @@ def check_throttle(scope: str, ip: str, identifier: Optional[str] = None,
 
 
 def record_failed_attempt(scope: str, ip: str, identifier: Optional[str] = None,
-                           ip_rule: ThrottleRule = RULE_IP_DEFAULT,
-                           identifier_rule: ThrottleRule = RULE_IDENTIFIER_DEFAULT) -> None:
+                          ip_rule: ThrottleRule = RULE_IP_DEFAULT,
+                          identifier_rule: ThrottleRule = RULE_IDENTIFIER_DEFAULT) -> None:
     """ """
     _record_attempt(scope, 'ip', ip, ip_rule)
     if identifier:

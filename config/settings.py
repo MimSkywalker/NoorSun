@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     # Tools
     "debug_toolbar",
     'django_recaptcha',
+    'django.contrib.sites',
+    'django.contrib.sitemaps',
 
 
     # Apps
@@ -226,3 +228,8 @@ RECAPTCHA_PRIVATE_KEY = env('RECAPTCHA_PRIVATE_KEY', default='')
 RECAPTCHA_REQUIRED_SCORE = env.float('RECAPTCHA_REQUIRED_SCORE', default=0.5)
 
 SILENCED_SYSTEM_CHECKS = ['django_recaptcha.recaptcha_test_key_error'] if DEBUG else []
+
+
+
+# Site config
+SITE_ID = 1

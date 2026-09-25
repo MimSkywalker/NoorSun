@@ -35,10 +35,13 @@ from .services import (
     attach_campaign_prices,
 )
 
+from core.throttling import check_throttle, get_client_ip
 
 # -----------------------
 # CRUD of product
 # -----------------------
+
+
 class ProductListView(ListView):
     model = Product
     template_name = 'products/product_list.html'
@@ -110,7 +113,8 @@ class ProductDetailView(DetailView):
         context['similar_products'] = attach_campaign_prices(
             get_similar_products(self.object))
         context['is_unavailable'] = not self.object.is_active
-        context['approved_reviews'] = self.object.reviews.filter(is_approved=True).select_related('user')
+        context['approved_reviews'] = self.object.reviews.filter(
+            is_approved=True).select_related('user')
         return context
 
 
@@ -290,11 +294,13 @@ class ReviewCreateView(CreateView):
     def form_valid(self, form):
         if not self.request.user.is_authenticated:
             ip = get_client_ip(self.request)
-            throttle_result = check_throttle(scope='review_create', ip=ip, identifier=None)
+            throttle_result = check_throttle(
+                scope='review_create', ip=ip, identifier=None)
             if not throttle_result.allowed:
-                messages.error(self.request, "تعداد ثبت نظر بیش از حد مجاز بود. کمی بعد تلاش کنید.")
+                messages.error(
+                    self.request, "تعداد ثبت نظر بیش از حد مجاز بود. کمی بعد تلاش کنید.")
                 return self.form_invalid(form)
-            
+
         if self.request.user.is_authenticated:
             form.instance.guest_name = ''
         messages.success(
