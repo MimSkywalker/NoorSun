@@ -45,7 +45,7 @@ INSTALLED_APPS = [
     'django_recaptcha',
     'django.contrib.sites',
     'django.contrib.sitemaps',
-
+    'django_ckeditor_5',
 
     # Apps
     'core',
@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'addresses',
     'notifications',
     'support',
+    'blog',
 ]
 
 MIDDLEWARE = [
@@ -233,3 +234,73 @@ SILENCED_SYSTEM_CHECKS = ['django_recaptcha.recaptcha_test_key_error'] if DEBUG 
 
 # Site config
 SITE_ID = 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+# CK5 Editor
+CKEDITOR_5_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+CKEDITOR_5_UPLOAD_PATH = 'ckeditor_uploads/'
+
+CKEDITOR_5_CONFIGS = {
+    'default': {
+        'language': 'fa',
+        'toolbar': {
+            'items': [
+                'heading', '|',
+                'bold', 'italic', 'underline', 'strikethrough', 'subscript', 'superscript', 'removeFormat', '|',
+                'fontSize', 'fontFamily', 'fontColor', 'fontBackgroundColor', 'highlight', '|',
+                'alignment', '|',
+                'bulletedList', 'numberedList', 'todoList', 'outdent', 'indent', '|',
+                'link', 'blockQuote', 'insertTable', 'mediaEmbed', 'horizontalLine', 'specialCharacters', '|',
+                'insertImage', '|',
+                'code', 'codeBlock', 'sourceEditing', '|',
+                'undo', 'redo',
+            ],
+            'shouldNotGroupWhenFull': True,
+        },
+        'image': {
+            'toolbar': [
+                'imageTextAlternative', 'toggleImageCaption', '|',
+                'imageStyle:alignLeft', 'imageStyle:alignCenter', 'imageStyle:alignRight', 'imageStyle:full',
+            ],
+            'styles': ['alignLeft', 'alignCenter', 'alignRight', 'full'],
+        },
+        'table': {
+            'contentToolbar': [
+                'tableColumn', 'tableRow', 'mergeTableCells', 'tableProperties', 'tableCellProperties',
+            ],
+        },
+        'fontFamily': {
+            'options': [
+                'default',
+                'IRANSans, Tahoma, sans-serif',
+                'Vazir, Tahoma, sans-serif',
+                'Arial, Helvetica, sans-serif',
+                'Georgia, serif',
+            ],
+            'supportAllValues': True,
+        },
+        'fontSize': {
+            'options': [10, 12, 14, 'default', 18, 20, 24, 28, 32],
+        },
+        'htmlSupport': {
+            'allow': [
+                {'name': '/.*/', 'attributes': True, 'classes': True, 'styles': True},
+            ],
+        },
+        'link': {
+            'addTargetToExternalLinks': True,
+            'defaultProtocol': 'https://',
+        },
+    },
+}

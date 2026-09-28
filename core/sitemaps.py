@@ -1,5 +1,6 @@
 from django.contrib.sitemaps import Sitemap
 from django.urls import reverse
+from blog.models import Post, PostCategory
 
 from products.models import Product, Category, Brand, Campaign
 from support.models import FAQ
@@ -78,3 +79,29 @@ class StaticViewSitemap(Sitemap):
 
     def priority_func(self, item):
         return 1.0 if item == 'home' else 0.4
+
+
+
+class BlogPostSitemap(Sitemap):
+    changefreq = 'weekly'
+    priority = 0.6
+
+    def items(self):
+        return Post.objects.filter(status=Post.Status.PUBLISHED)
+
+    def lastmod(self, obj):
+        return obj.updated_at
+
+    def location(self, obj):
+        return reverse('blog:detail', kwargs={'slug': obj.slug})
+
+
+class BlogCategorySitemap(Sitemap):
+    changefreq = 'monthly'
+    priority = 0.3
+
+    def items(self):
+        return PostCategory.objects.all()
+
+    def location(self, obj):
+        return f"{reverse('blog:list')}?category={obj.slug}"

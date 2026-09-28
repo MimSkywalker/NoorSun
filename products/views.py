@@ -37,6 +37,10 @@ from .services import (
 
 from core.throttling import check_throttle, get_client_ip
 
+from blog.models import Post
+
+
+
 # -----------------------
 # CRUD of product
 # -----------------------
@@ -200,6 +204,10 @@ class HomeView(TemplateView):
             is_active=True, start_at__lte=now, end_at__gte=now
         ).order_by('end_at')[:4]
 
+
+        context['latest_posts'] = Post.objects.filter(
+            status=Post.Status.PUBLISHED
+        ).select_related('category')[:4]
         return context
 
 

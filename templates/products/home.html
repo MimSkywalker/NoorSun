@@ -8,49 +8,65 @@
 {% block og_title %}{{ product.title }}{% endblock %}
 {% block og_description %}{{ product.description|striptags|truncatewords:25 }}{% endblock %}
 {% block og_tags %}
-    {{ block.super }}
-    <meta property="og:type" content="product">
-    {% if product.default_variant %}
-    <meta property="product:price:amount" content="{{ product.default_variant.final_price }}">
-    <meta property="product:price:currency" content="IRR">
-    {% endif %}
+{{ block.super }}
+<meta property="og:type" content="product">
+{% if product.default_variant %}
+<meta property="product:price:amount" content="{{ product.default_variant.final_price }}">
+<meta property="product:price:currency" content="IRR">
+{% endif %}
 {% endblock %}
 {% block og_image %}
-    {% if product.main_image %}
-    <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ product.main_image.image.url }}">
-    {% else %}
-    {{ block.super }}
-    {% endif %}
+{% if product.main_image %}
+<meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ product.main_image.image.url }}">
+{% else %}
+{{ block.super }}
+{% endif %}
 {% endblock %}
 
 {% block twitter_title %}{{ product.title }}{% endblock %}
 {% block twitter_description %}{{ product.description|striptags|truncatewords:25 }}{% endblock %}
 {% block twitter_image %}
-    {% if product.main_image %}
-    <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{{ product.main_image.image.url }}">
-    {% else %}
-    {{ block.super }}
-    {% endif %}
+{% if product.main_image %}
+<meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{{ product.main_image.image.url }}">
+{% else %}
+{{ block.super }}
+{% endif %}
 {% endblock %}
 
 
 {% block content %}
-  {% if active_campaigns %}
-    <section class="home-campaigns">
-      <h2>کمپین‌های فعال</h2>
-      <div class="campaign-grid">
-        {% for campaign in active_campaigns %}
-          <a href="{% url 'products:list' %}?campaign={{ campaign.slug }}" class="campaign-card">
-            <h3>{{ campaign.title }}</h3>
-            <p class="campaign-end">تا {{ campaign.end_at|date:'Y/m/d H:i' }}</p>
-          </a>
-        {% endfor %}
-      </div>
-      <a href="{% url 'products:campaign_list' %}" class="see-all-link">مشاهده‌ی همه‌ی کمپین‌ها ←</a>
-    </section>
-  {% endif %}
+{% if active_campaigns %}
+<section class="home-campaigns">
+  <h2>کمپین‌های فعال</h2>
+  <div class="campaign-grid">
+    {% for campaign in active_campaigns %}
+    <a href="{% url 'products:list' %}?campaign={{ campaign.slug }}" class="campaign-card">
+      <h3>{{ campaign.title }}</h3>
+      <p class="campaign-end">تا {{ campaign.end_at|date:'Y/m/d H:i' }}</p>
+    </a>
+    {% endfor %}
+  </div>
+  <a href="{% url 'products:campaign_list' %}" class="see-all-link">مشاهده‌ی همه‌ی کمپین‌ها ←</a>
+</section>
+{% endif %}
 
-  {% include 'products/_product_row.html' with section_title='جدیدترین‌ها' section_products=new_products %}
-  {% include 'products/_product_row.html' with section_title='پرفروش‌ترین‌ها' section_products=bestselling_products %}
-  {% include 'products/_product_row.html' with section_title='تخفیف‌دارها' section_products=discounted_products %}
+{% include 'products/_product_row.html' with section_title='جدیدترین‌ها' section_products=new_products %}
+{% include 'products/_product_row.html' with section_title='پرفروش‌ترین‌ها' section_products=bestselling_products %}
+{% include 'products/_product_row.html' with section_title='تخفیف‌دارها' section_products=discounted_products %}
+{% if latest_posts %}
+<section class="home-blog-section">
+  <h2>آخرین مطالب وبلاگ</h2>
+  <div class="blog-row">
+    {% for post in latest_posts %}
+    <article class="post-card">
+      {% if post.cover_image %}<img src="{{ post.cover_image.url }}" alt="{{ post.title }}">{% endif %}
+      <h3><a href="{{ post.get_absolute_url }}">{{ post.title }}</a></h3>
+    </article>
+    {% endfor %}
+  </div>
+  <a href="{% url 'blog:list' %}">مشاهده‌ی همه‌ی مطالب</a>
+</section>
+{% endif %}
+
+
 {% endblock %}

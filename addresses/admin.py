@@ -5,7 +5,6 @@ from .models import Province, City, Address
 @admin.register(Province)
 class ProvinceAdmin(admin.ModelAdmin):
     list_display = ('title', 'slug')
-    prepopulated_fields = {'slug': ('title',)}
     search_fields = ('title',)
 
 
@@ -14,7 +13,6 @@ class CityAdmin(admin.ModelAdmin):
     list_display = ('title', 'province', 'slug')
     list_filter = ('province',)
     search_fields = ('title', 'province__title')
-    prepopulated_fields = {'slug': ('title',)}
     autocomplete_fields = ('province',)
 
 

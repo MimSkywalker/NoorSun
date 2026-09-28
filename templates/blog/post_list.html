@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}وبلاگ{% endblock %}
+{% block meta_description %}آخرین مطالب و اخبار فروشگاه{% endblock %}
+
+{% block content %}
+<div class="blog-list-layout">
+    <aside class="blog-sidebar">
+        <form method="get">
+            <input type="text" name="q" placeholder="جستجو در وبلاگ" value="{{ request.GET.q }}">
+            <button type="submit">جستجو</button>
+        </form>
+        <h3>دسته‌ها</h3>
+        <ul>
+            {% for category in categories %}
+            <li><a href="?category={{ category.slug }}">{{ category.title }}</a></li>
+            {% endfor %}
+        </ul>
+    </aside>
+
+    <div class="blog-grid">
+        {% for post in posts %}
+        <article class="post-card">
+            {% if post.cover_image %}<img src="{{ post.cover_image.url }}" alt="{{ post.title }}">{% endif %}
+            <h2><a href="{{ post.get_absolute_url }}">{{ post.title }}</a></h2>
+            <p>{{ post.excerpt }}</p>
+        </article>
+        {% empty %}
+        <p>هنوز پستی منتشر نشده.</p>
+        {% endfor %}
+    </div>
+
+    {% if is_paginated %}
+    <div class="pagination">
+        {% if page_obj.has_previous %}
+        <a
+            href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.tag %}&tag={{ request.GET.tag }}{% endif %}">قبلی</a>
+        {% endif %}
+
+        <span>صفحه‌ی {{ page_obj.number }} از {{ page_obj.paginator.num_pages }}</span>
+
+        {% if page_obj.has_next %}
+        <a
+            href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.tag %}&tag={{ request.GET.tag }}{% endif %}">بعدی</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

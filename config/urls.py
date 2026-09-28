@@ -22,13 +22,17 @@ from django.conf.urls.static import static
 from products.views import HomeView
 
 
-
 from django.contrib.sitemaps.views import sitemap
 from core.sitemaps import (
     ProductSitemap, CategorySitemap, BrandSitemap,
     CampaignSitemap, FAQSitemap, StaticViewSitemap,
+    BlogPostSitemap, BlogCategorySitemap
 )
-from core.views import robots_txt
+from core.views import robots_txt, ckeditor5_upload_image
+
+from django.contrib.admin.views.decorators import staff_member_required
+from django_ckeditor_5.views import upload_file
+
 
 sitemaps = {
     'products': ProductSitemap,
@@ -37,6 +41,8 @@ sitemaps = {
     'campaigns': CampaignSitemap,
     'faq': FAQSitemap,
     'static': StaticViewSitemap,
+    'blog_posts': BlogPostSitemap,
+    'blog_categories': BlogCategorySitemap,
 }
 
 
@@ -51,8 +57,13 @@ urlpatterns = [
     path('orders/', include('orders.urls')),
     path('notifications/', include('notifications.urls')),
     path('support/', include('support.urls')),
+    path('blog/', include('blog.urls')),
 
-    path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
+    path('ckeditor5/image-upload/', ckeditor5_upload_image,
+         name='ck_editor_5_upload_file'),
+
+    path('sitemap.xml', sitemap, {'sitemaps': sitemaps},
+         name='django.contrib.sitemaps.views.sitemap'),
     path('robots.txt', robots_txt, name='robots_txt'),
 ]
 
@@ -62,7 +73,7 @@ if settings.DEBUG:
 
 if settings.DEBUG:
     import debug_toolbar
-    
+
 urlpatterns = [
-        path("__debug__/", include(debug_toolbar.urls)),
-    ] + urlpatterns
+    path("__debug__/", include(debug_toolbar.urls)),
+] + urlpatterns

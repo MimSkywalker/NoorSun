@@ -6,15 +6,28 @@ from core.models import TimeStampedModel
 from django.conf import settings
 from users.models import phone_validator
 
-from .utils import product_image_upload_path, process_product_image
-from .validators import validate_image_size, validate_image_extension
+import io
+import uuid
 
+from .utils import (
+    product_image_upload_path,
+    product_image_jpg_upload_path,
+    process_product_image,
+    process_product_image_jpg,
+)
+from .validators import validate_image_size, validate_image_extension
+from django_ckeditor_5.fields import CKEditor5Field
+from core.slugs import generate_unique_slug, slug_source_for
 
 class Category(TimeStampedModel):
 
     """Stores hierarchical product categories."""
 
     name = models.CharField(max_length=150)
+    title_en = models.CharField(
+    max_length=255, blank=True,
+    help_text="عنوان انگلیسی؛ در صورت پر بودن، اسلاگ از روی همین ساخته می‌شود.",
+)
     slug = models.SlugField(max_length=170, unique=True, blank=True)
     parent = models.ForeignKey(
         'self',
@@ -37,7 +50,8 @@ class Category(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.name, allow_unicode=True)
+            source, allow_unicode = slug_source_for(self)
+            self.slug = generate_unique_slug(type(self), source, self.pk, allow_unicode=allow_unicode)
         super().save(*args, **kwargs)
 
 
@@ -46,6 +60,10 @@ class Brand(TimeStampedModel):
     """Stores product brand information."""
 
     name = models.CharField(max_length=150, unique=True)
+    title_en = models.CharField(
+    max_length=255, blank=True,
+    help_text="عنوان انگلیسی؛ در صورت پر بودن، اسلاگ از روی همین ساخته می‌شود.",
+)
     slug = models.SlugField(max_length=170, unique=True, blank=True)
     logo = models.ImageField(upload_to='brands/', blank=True, null=True)
     is_active = models.BooleanField(default=True)
@@ -60,7 +78,8 @@ class Brand(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.name, allow_unicode=True)
+            source, allow_unicode = slug_source_for(self)
+            self.slug = generate_unique_slug(type(self), source, self.pk, allow_unicode=allow_unicode)
         super().save(*args, **kwargs)
 
 
@@ -103,8 +122,12 @@ class AttributeValue(TimeStampedModel):
 class Product(TimeStampedModel):
     """Stores main product information."""
     title = models.CharField(max_length=255)
+    title_en = models.CharField(
+    max_length=255, blank=True,
+    help_text="عنوان انگلیسی؛ در صورت پر بودن، اسلاگ از روی همین ساخته می‌شود.",
+)
     slug = models.SlugField(max_length=280, unique=True, blank=True)
-    description = models.TextField(blank=True)
+    description = CKEditor5Field('توضیحات', config_name='default', blank=True)
     category = models.ForeignKey(
         Category,
         on_delete=models.PROTECT,
@@ -158,13 +181,8 @@ class Product(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            base_slug = slugify(self.title, allow_unicode=True)
-            slug = base_slug
-            counter = 1
-            while Product.objects.filter(slug=slug).exclude(pk=self.pk).exists():
-                counter += 1
-                slug = f'{base_slug}-{counter}'
-            self.slug = slug
+            source, allow_unicode = slug_source_for(self)
+            self.slug = generate_unique_slug(type(self), source, self.pk, allow_unicode=allow_unicode)
         super().save(*args, **kwargs)
 
 
@@ -177,7 +195,13 @@ class ProductImage(TimeStampedModel):
     )
     image = models.ImageField(
         upload_to=product_image_upload_path,
-        validators=[validate_image_size, validate_image_extension],)
+        validators=[validate_image_size, validate_image_extension],
+    )
+    image_jpg = models.ImageField(
+        upload_to=product_image_jpg_upload_path,
+        blank=True, null=True, editable=False,
+        help_text="نسخه‌ی خودکار JPG از image، مخصوص og:image.",
+    )
 
     is_main = models.BooleanField(default=False)
     order = models.PositiveSmallIntegerField(default=0)
@@ -200,29 +224,26 @@ class ProductImage(TimeStampedModel):
                     "هر محصول حداکثر می‌تواند ۶ تصویر داشته باشد.")
 
     def save(self, *args, **kwargs):
-
         self.full_clean()
 
+        should_process = False
         if self.pk:
             old_image = ProductImage.objects.get(pk=self.pk).image
-
             if old_image.name != self.image.name:
-                processed = process_product_image(self.image)
-
-                self.image.save(
-                    self.image.name,
-                    processed,
-                    save=False,
-                )
-
+                should_process = True
         else:
-            processed = process_product_image(self.image)
+            should_process = True
 
-            self.image.save(
-                self.image.name,
-                processed,
-                save=False,
-            )
+        if should_process:
+
+            self.image.seek(0)
+            raw_bytes = self.image.read()
+
+            webp_content = process_product_image(io.BytesIO(raw_bytes))
+            self.image.save(self.image.name, webp_content, save=False)
+
+            jpg_content = process_product_image_jpg(io.BytesIO(raw_bytes))
+            self.image_jpg.save(f'{uuid.uuid4().hex}.jpg', jpg_content, save=False)
 
         super().save(*args, **kwargs)
 
@@ -234,7 +255,6 @@ class ProductImage(TimeStampedModel):
             ).update(
                 is_main=False
             )
-
 
 class ProductVariant(TimeStampedModel):
     """Represents a purchasable product variant with its own price and stock."""
@@ -365,6 +385,10 @@ class Campaign(TimeStampedModel):
         FIXED = 'fixed', 'مبلغ ثابت'
 
     title = models.CharField(max_length=200)
+    title_en = models.CharField(
+    max_length=255, blank=True,
+    help_text="عنوان انگلیسی؛ در صورت پر بودن، اسلاگ از روی همین ساخته می‌شود.",
+)
     slug = models.SlugField(max_length=220, unique=True, blank=True)
 
     discount_type = models.CharField(
@@ -393,7 +417,8 @@ class Campaign(TimeStampedModel):
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.title, allow_unicode=True)
+            source, allow_unicode = slug_source_for(self)
+            self.slug = generate_unique_slug(type(self), source, self.pk, allow_unicode=allow_unicode)
         super().save(*args, **kwargs)
 
     def clean(self):

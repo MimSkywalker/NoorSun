@@ -109,7 +109,6 @@ class ProductAdmin(admin.ModelAdmin):
     )
     list_filter = ('is_active', 'category', 'brand')
     search_fields = ('title', 'description')
-    prepopulated_fields = {'slug': ('title',)}
     autocomplete_fields = ('category', 'brand', 'replacement_product')
     inlines = [ProductImageInline, ProductVariantInline]
 
@@ -171,7 +170,6 @@ class CampaignAdmin(admin.ModelAdmin):
     list_display = ('title', 'discount_type', 'value',
                     'start_at', 'end_at', 'is_active', 'is_running')
     list_filter = ('is_active', 'discount_type')
-    prepopulated_fields = {'slug': ('title',)}
     filter_horizontal = ('categories', 'brands', 'products')
     list_editable = ('is_active',)
 

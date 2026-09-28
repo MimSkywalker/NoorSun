@@ -8,6 +8,7 @@ class ProductForm(forms.ModelForm):
         model = Product
         fields = [
             'title',
+            'title_en',
             'description',
             'category',
             'brand',
