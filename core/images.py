@@ -56,3 +56,19 @@ def convert_to_jpg(source, max_size=(1200, 630), quality=DEFAULT_JPG_QUALITY, ba
     image.save(buffer, format='JPEG', quality=quality, optimize=True)
     buffer.seek(0)
     return ContentFile(buffer.read(), name=f'{uuid.uuid4().hex}.jpg')
+
+
+
+
+def crop_to_webp(source, size, quality=DEFAULT_WEBP_QUALITY):
+    """
+
+    """
+    image = _load_image(source)
+    if image.mode not in ('RGB', 'RGBA'):
+        image = image.convert('RGBA') if 'A' in image.getbands() else image.convert('RGB')
+    image = ImageOps.fit(image, size, method=Image.LANCZOS, centering=(0.5, 0.5))
+    buffer = io.BytesIO()
+    image.save(buffer, format='WEBP', quality=quality, method=6)
+    buffer.seek(0)
+    return ContentFile(buffer.read(), name=f'{uuid.uuid4().hex}.webp')

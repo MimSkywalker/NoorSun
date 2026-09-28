@@ -74,7 +74,9 @@
     <footer>
       <p>فروشگاه — نسخه‌ی توسعه</p>
     </footer>
-
+{% for p in footer_pages %}<a href="{{ p.url }}">{{ p.title }}</a>{% endfor %}
+{# و برای منو: #}
+{% for p in menu_pages %}<a href="{{ p.url }}">{{ p.title }}</a>{% endfor %}
     {% block extra_js %}
 
     {% endblock %}

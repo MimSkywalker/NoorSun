@@ -4,7 +4,7 @@ from blog.models import Post, PostCategory
 
 from products.models import Product, Category, Brand, Campaign
 from support.models import FAQ
-
+from pages.models import StaticPage
 
 class ProductSitemap(Sitemap):
     changefreq = 'daily'
@@ -105,3 +105,14 @@ class BlogCategorySitemap(Sitemap):
 
     def location(self, obj):
         return f"{reverse('blog:list')}?category={obj.slug}"
+
+
+class StaticPageSitemap(Sitemap):
+    changefreq = 'monthly'
+    priority = 0.4
+
+    def items(self):
+        return StaticPage.objects.filter(is_active=True, include_in_sitemap=True)
+
+    def lastmod(self, obj):
+        return obj.updated_at

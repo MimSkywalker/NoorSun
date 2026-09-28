@@ -68,5 +68,22 @@
 </section>
 {% endif %}
 
+{% if slides %}
+<section class="home-slider">
+    {% for slide in slides %}
+    <div class="slide">
+        {% if slide.link_url %}<a href="{{ slide.link_url }}">{% endif %}
+        <picture>
+            <source media="(max-width: 768px)" srcset="{{ slide.mobile_image_or_desktop.url }}">
+            <img src="{{ slide.image.url }}" alt="{{ slide.image_alt|default:slide.title }}">
+        </picture>
+        {% if slide.link_url %}</a>{% endif %}
+        {% if slide.title %}<h2>{{ slide.title }}</h2>{% endif %}
+        {% if slide.subtitle %}<p>{{ slide.subtitle }}</p>{% endif %}
+        {% if slide.button_text %}<a class="btn" href="{{ slide.link_url }}">{{ slide.button_text }}</a>{% endif %}
+    </div>
+    {% endfor %}
+</section>
+{% endif %}
 
 {% endblock %}

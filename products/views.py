@@ -38,7 +38,7 @@ from .services import (
 from core.throttling import check_throttle, get_client_ip
 
 from blog.models import Post
-
+from pages.models import Slide
 
 
 # -----------------------
@@ -208,6 +208,7 @@ class HomeView(TemplateView):
         context['latest_posts'] = Post.objects.filter(
             status=Post.Status.PUBLISHED
         ).select_related('category')[:4]
+        context['slides'] = Slide.objects.visible()
         return context
 
 

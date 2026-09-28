@@ -26,7 +26,7 @@ from django.contrib.sitemaps.views import sitemap
 from core.sitemaps import (
     ProductSitemap, CategorySitemap, BrandSitemap,
     CampaignSitemap, FAQSitemap, StaticViewSitemap,
-    BlogPostSitemap, BlogCategorySitemap
+    BlogPostSitemap, BlogCategorySitemap, StaticPageSitemap
 )
 from core.views import robots_txt, ckeditor5_upload_image
 
@@ -43,6 +43,7 @@ sitemaps = {
     'static': StaticViewSitemap,
     'blog_posts': BlogPostSitemap,
     'blog_categories': BlogCategorySitemap,
+    'pages': StaticPageSitemap,
 }
 
 
@@ -58,6 +59,7 @@ urlpatterns = [
     path('notifications/', include('notifications.urls')),
     path('support/', include('support.urls')),
     path('blog/', include('blog.urls')),
+    path('pages/', include('pages.urls')),
 
     path('ckeditor5/image-upload/', ckeditor5_upload_image,
          name='ck_editor_5_upload_file'),

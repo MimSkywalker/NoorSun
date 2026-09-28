@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'notifications',
     'support',
     'blog',
+    'pages'
 ]
 
 MIDDLEWARE = [
@@ -82,6 +83,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                 'pages.context_processors.static_pages_nav',
             ],
         },
     },
@@ -304,3 +306,23 @@ CKEDITOR_5_CONFIGS = {
         },
     },
 }
+
+
+
+
+
+
+
+
+
+
+
+# Slider Settings
+SLIDER_DESKTOP_SIZE = (
+    env.int('SLIDER_DESKTOP_WIDTH', default=1920),
+    env.int('SLIDER_DESKTOP_HEIGHT', default=700),
+)
+SLIDER_MOBILE_SIZE = (
+    env.int('SLIDER_MOBILE_WIDTH', default=800),
+    env.int('SLIDER_MOBILE_HEIGHT', default=800),
+)

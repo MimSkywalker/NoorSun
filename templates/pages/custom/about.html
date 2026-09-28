@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page.effective_meta_title }}{% endblock %}
+{% block meta_description %}{{ page.meta_description }}{% endblock %}
+{% block og_title %}{{ page.effective_meta_title }}{% endblock %}
+{% block og_description %}{{ page.meta_description }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/pages/about.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="about-hero">
+    <h1>{{ page.title }}</h1>
+    {# هر چیدمان و HTML دلخواه اینجا #}
+</section>
+<p>تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست
+    تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست
+    تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست
+    تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست
+    تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست
+    تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست تست </p>
+{% if page.content %}
+<div class="about-body">{{ page.content|safe }}</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}{% endblock %}
